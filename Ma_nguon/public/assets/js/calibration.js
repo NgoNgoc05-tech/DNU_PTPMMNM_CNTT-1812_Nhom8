@@ -16,11 +16,12 @@
     });
     view.setItems([{ id: 1, seq_no: 1, shape: 'POINT', x: 750, y: 150, status: 'OPEN' }]);
     if (Number(d.zoom) !== 1) { view.setZoom(Number(d.zoom)); }
+    // Vị trí tâm dấu trong khung = giá trị left/top mà annotator.js đặt cho dấu (đơn vị px CSS).
+    // Không đo bằng getBoundingClientRect vì khi Windows/Chrome phóng to 110–150% trình duyệt làm tròn
+    // tới pixel thiết bị, gây sai số đo ~0,4 px dù dấu vẫn đúng chỗ.
     var pin = box.querySelector('.mark-pin');
-    var b = box.getBoundingClientRect();
-    var p = pin.getBoundingClientRect();
-    var sx = p.left + p.width / 2 - b.left - box.clientLeft;
-    var sy = p.top + p.height / 2 - b.top - box.clientTop;
+    var sx = parseFloat(pin.style.left);
+    var sy = parseFloat(pin.style.top);
     var back = PinCoords.toImage(sx, sy, view.content(), 1000, 500);
     var ok = Math.abs(sx - d.ex) <= 0.5 && Math.abs(sy - d.ey) <= 0.5 && Math.abs(back.x - 750) <= 0.5 && Math.abs(back.y - 150) <= 0.5;
     results.push({ id: d.case, ok: ok, sx: sx, sy: sy });

@@ -9,6 +9,27 @@
 - Phân trang trang Tìm góp ý khi dự án có hàng nghìn góp ý.
 - Thông báo thời gian thực khi có trả lời mới.
 
+## [2.1.0] - 2026-10-24
+
+### Thêm
+- **Thông báo** (chuông trên đầu trang, trang `/notifications.php`): khi được @nhắc tên, được giao việc, có trả lời mới trong góp ý
+  của mình hoặc mình phụ trách, góp ý của mình đổi trạng thái. Đánh dấu đã đọc từng cái hoặc tất cả.
+- **Xoá ảnh tải nhầm**: xoá phiên bản đang xem (cùng góp ý của phiên bản đó), xoá màn hình, xoá dự án (chỉ người tạo, gõ lại tên để xác nhận).
+- **Hồ sơ của tôi** (`/profile.php`): đổi họ tên, chức danh, đổi mật khẩu; thống kê hoạt động; dự án và quyền; thông báo gần đây.
+- **Hỗ trợ khách hàng** (`/help.php`): câu hỏi thường gặp, gửi yêu cầu hỗ trợ, theo dõi “Yêu cầu của tôi”; bộ phận hỗ trợ trả lời bằng `php tools/support.php`.
+- **Trợ lý ảo** (khung chat nổi + trang Hỗ trợ): trả lời câu hỏi về cách dùng ứng dụng bằng cơ sở tri thức chạy trên máy;
+  tuỳ chọn dùng mô hình AI khi đặt biến môi trường `PINPOINT_AI_KEY`.
+- Ô **hạn xử lý theo dạng ngày/tháng/năm** (dd/mm/yyyy), gõ trực tiếp hoặc chọn trên lịch, không phụ thuộc ngôn ngữ trình duyệt.
+- `Dockerfile` và hướng dẫn triển khai lên Render.
+
+### Thay đổi
+- Bỏ mục “Phép thử toạ độ” khỏi thanh menu (trang vẫn ở `/calibration.php`, có liên kết trong trang Hỗ trợ).
+- Menu tài khoản: Hồ sơ của tôi, Thông báo, Hỗ trợ khách hàng (bỏ hai mục trùng với thanh menu).
+
+### Sửa
+- Trang phép thử toạ độ báo “KHÔNG ĐẠT” khi Windows/Chrome phóng to 110–150% do đo bằng vị trí đã làm tròn tới pixel thiết bị;
+  nay so sánh bằng toạ độ CSS mà trình xem đặt cho dấu.
+
 ## [2.0.0] - 2026-10-24
 
 ### Thêm

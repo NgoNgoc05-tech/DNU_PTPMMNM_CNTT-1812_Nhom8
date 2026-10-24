@@ -134,6 +134,61 @@
     return select;
   }
 
+  /**
+   * Ô ngày hiển thị theo kiểu Việt Nam ngày/tháng/năm (dd/mm/yyyy) — không phụ thuộc ngôn ngữ trình duyệt.
+   * Gõ trực tiếp hoặc bấm biểu tượng lịch để chọn. getIso() trả về yyyy-mm-dd cho máy chủ ('' = không đặt).
+   */
+  function dateField(iso, label, onChange) {
+    var wrap = el('span', { class: 'date-field' });
+    var text = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'ngày/tháng/năm', maxlength: '10', 'aria-label': label,
+      autocomplete: 'off', value: dmy(iso) });
+    var picker = el('input', { type: 'date', tabindex: '-1', 'aria-hidden': 'true', class: 'date-native', value: iso || '' });
+    var btn = el('button', { type: 'button', class: 'date-btn', title: 'Chọn ngày trên lịch', 'aria-label': 'Chọn ngày trên lịch' }, [icon('calendar')]);
+    var current = iso || '';
+    function parse(v) {
+      v = v.trim();
+      if (v === '') { return ''; }
+      var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(v);
+      if (!m) { return null; }
+      var d = +m[1], mo = +m[2], y = +m[3];
+      var dt = new Date(Date.UTC(y, mo - 1, d));
+      if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) { return null; }
+      return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    }
+    function commit(newIso) {
+      text.classList.remove('is-invalid');
+      text.value = dmy(newIso);
+      picker.value = newIso;
+      if (newIso !== current) { current = newIso; if (onChange) { onChange(newIso); } }
+    }
+    text.addEventListener('input', function () {
+      // tự thêm dấu "/" khi gõ số: 2110 -> 21/10
+      var digits = text.value.replace(/[^0-9]/g, '').slice(0, 8);
+      if (/^[0-9\/]*$/.test(text.value)) {
+        text.value = digits.length > 4 ? digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4)
+          : digits.length > 2 ? digits.slice(0, 2) + '/' + digits.slice(2) : digits;
+      }
+    });
+    text.addEventListener('change', function () {
+      var v = parse(text.value);
+      if (v === null) { text.classList.add('is-invalid'); toast('Ngày không hợp lệ. Nhập theo dạng ngày/tháng/năm, ví dụ 25/10/2026.', true); return; }
+      commit(v);
+    });
+    text.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); text.dispatchEvent(new Event('change')); } });
+    picker.addEventListener('change', function () { commit(picker.value); });
+    btn.addEventListener('click', function () {
+      if (picker.showPicker) { try { picker.showPicker(); return; } catch (e) { /* trình duyệt cũ */ } }
+      picker.focus();
+      picker.click();
+    });
+    wrap.appendChild(text);
+    wrap.appendChild(btn);
+    wrap.appendChild(picker);
+    wrap.getIso = function () { var v = parse(text.value); return v === null ? '' : v; };
+    wrap.input = text;
+    return wrap;
+  }
+
   /** Đoạn văn có @tên thành viên được tô màu; mọi phần đều là textContent. */
   function richBody(text, members, cls) {
     var box = el('div', { class: cls || 'thread-body' });
@@ -305,14 +360,14 @@
     var cSel = options(el('select', { 'aria-label': 'Nhãn phân loại', name: 'category' }), CATEGORY, 'OTHER');
     var aSel = el('select', { 'aria-label': 'Người phụ trách', name: 'assignee' }, [el('option', { value: '0', text: 'Chưa giao' })]);
     (cfg.members || []).forEach(function (m) { if (m.role !== 'VIEW') { aSel.appendChild(el('option', { value: m.id, text: cleanName(m.name) })); } });
-    var dIn = el('input', { type: 'date', 'aria-label': 'Hạn xử lý', name: 'due' });
+    var dIn = dateField('', 'Hạn xử lý');
     var send = el('button', { class: 'btn btn-sm', type: 'submit' }, [icon('send'), 'Lưu góp ý']);
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
       if (!comp.area.value.trim()) { comp.area.focus(); return; }
       send.disabled = true;
       self.opt.api.post({ action: 'create', version_id: cfg.versionId, shape: d.shape, x: d.x, y: d.y, w: d.w, h: d.h, body: comp.area.value,
-        priority: pSel.value, category: cSel.value, assignee_id: Number(aSel.value), due_date: dIn.value })
+        priority: pSel.value, category: cSel.value, assignee_id: Number(aSel.value), due_date: dIn.getIso() })
         .then(function (res) { toast('Đã lưu góp ý #' + res.item.seq_no); onDone(); self.opt.onChanged(res.item.id); })
         .catch(function (err) { send.disabled = false; toast(err.message, true); });
     } }, [
@@ -435,7 +490,8 @@
       (cfg.members || []).forEach(function (m) {
         if (m.role !== 'VIEW' || m.id === a.assignee_id) { s.appendChild(el('option', { value: m.id, text: cleanName(m.name), selected: m.id === a.assignee_id ? 'selected' : null })); }
       });
-      var d = el('input', { type: 'date', value: a.due_date || '', 'aria-label': 'Hạn xử lý', 'data-prop': 'due', onchange: function () { save({ due_date: d.value }, d.value ? 'Đã đặt hạn xử lý' : 'Đã bỏ hạn xử lý').catch(function () {}); } });
+      var d = dateField(a.due_date || '', 'Hạn xử lý', function (iso) { save({ due_date: iso }, iso ? 'Đã đặt hạn xử lý' : 'Đã bỏ hạn xử lý').catch(function () {}); });
+      d.input.setAttribute('data-prop', 'due');
       row('flag', 'Ưu tiên', p);
       row('tag', 'Nhãn', c);
       row('user', 'Phụ trách', s);

@@ -27,6 +27,8 @@ Người tạo dự án luôn giữ quyền ADMIN. Quyền được kiểm tra �
 | StatusHistory | `status_history` | from → to, người đổi, `checked_version_id` = phiên bản dùng để kiểm tra, ghi chú |
 | (thuộc tính, bản 2.0) | cột mới của `annotations` | `priority ∈ {LOW, MEDIUM, HIGH, URGENT}`, `category ∈ {LAYOUT, COLOR, TYPO, CONTENT, UX, A11Y, OTHER}`, `assignee_id` → users (phải là thành viên dự án), `due_date`, **`note`** (ghi chú xử lý ≤ 4000 ký tự) + `note_updated_by/at` |
 | Reaction (bản 2.0) | `comment_reactions` | cảm xúc trên nhận xét/trả lời; khoá chính (comment_id, user_id, kind), `kind ∈ {LIKE, HEART, PARTY, EYES}` |
+| Notification (bản 2.1) | `notifications` | người nhận, người thực hiện, `kind ∈ {MENTION, ASSIGNED, REPLY, STATUS}`, góp ý liên quan, trích nội dung, `read_at` |
+| SupportTicket (bản 2.1) | `support_tickets` | yêu cầu hỗ trợ: loại, tiêu đề, nội dung, `status ∈ {OPEN, ANSWERED, CLOSED}`, trả lời |
 | ActivityEvent (bản 2.0) | `annotation_events` | nhật ký mọi thay đổi: `kind ∈ {CREATED, REPLIED, EDITED, STATUS, PRIORITY, CATEGORY, ASSIGNEE, DUE, NOTE}`, giá trị cũ/mới, chi tiết, người làm, thời điểm |
 
 Quan hệ 1–1 theo nghiệp vụ: mỗi Annotation có đúng một nhận xét gốc. Mỗi Screen có một phiên bản mới nhất, là phiên bản có `version_no` lớn nhất.
@@ -123,6 +125,10 @@ flowchart LR
 | `/projects.php` (GET/POST) | đăng nhập | Danh sách dự án của tôi; tạo dự án |
 | `/project.php?id=` | VIEW | Bảng tổng quan: thống kê, tiến độ, màn hình, thành viên, hoạt động gần đây |
 | `/project_edit.php` (POST) | ADMIN | Sửa tên/mô tả dự án; đổi tên màn hình |
+| `/notifications.php` (GET/POST) | đăng nhập | Thông báo của tôi; đánh dấu đã đọc |
+| `/profile.php` (GET/POST) | đăng nhập | Hồ sơ: đổi tên, chức danh, mật khẩu (cần mật khẩu hiện tại) |
+| `/help.php` (GET/POST) | đăng nhập | Hỗ trợ khách hàng: trợ lý ảo, câu hỏi thường gặp, gửi/đóng yêu cầu của mình |
+| `/delete.php` (POST) | ADMIN (dự án: chỉ người tạo + gõ lại tên) | Xoá phiên bản ảnh tải nhầm, xoá màn hình, xoá dự án |
 | `/inbox.php` | đăng nhập | Việc của tôi: góp ý chưa xử lý được giao cho tôi, nhóm theo quá hạn / sắp đến hạn |
 | `/members.php` (POST) | ADMIN | Thêm / đổi quyền / xoá thành viên |
 | `/screen_new.php`, `/version_new.php` (POST) | ADMIN | Tạo màn hình kèm v1; tải phiên bản mới |
@@ -134,12 +140,18 @@ flowchart LR
 | `/api.php?action=list&version=` (GET) | VIEW | Danh sách góp ý của một phiên bản (JSON) |
 | `/api.php?action=activity&project=&screen=` (GET) | VIEW | Nhật ký hoạt động (40 thay đổi mới nhất) |
 | `/api.php` `create` · `reply` · `edit` · `status` (POST) | COMMENT | Tạo dấu + nhận xét (kèm ưu tiên, nhãn, người phụ trách, hạn); trả lời; sửa (`lock_version`); đổi trạng thái (`lock_version`, `checked_version_id`) |
+| `/api.php?action=notifications` (GET), `notif_read` · `chat` (POST) | đăng nhập | Thông báo + số chưa đọc; đánh dấu đã đọc; hỏi trợ lý ảo |
 | `/api.php` `update` · `react` (POST) | COMMENT | Sửa thuộc tính/ghi chú (`lock_version`, chung khoá với trạng thái → CONFLICT kèm giá trị hiện tại); bật/tắt cảm xúc |
 | `/calibration.php` | — | Phép thử 1 trực quan |
 
 Mã lỗi API: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `CONFLICT` (409), `POSITION_OUTSIDE_IMAGE`, `RECT_TOO_SMALL`,
 `BODY_INVALID`, `STATUS_UNCHANGED`, `CHECKED_VERSION_INVALID`, `PRIORITY_INVALID`, `CATEGORY_INVALID`, `ASSIGNEE_NOT_MEMBER`,
-`DUE_DATE_INVALID`, `NOTE_TOO_LONG`, `REACTION_INVALID` (422).
+`DUE_DATE_INVALID`, `NOTE_TOO_LONG`, `REACTION_INVALID`, `LAST_VERSION`, `CONFIRM_MISMATCH`, `PASSWORD_WRONG`, `TICKET_INVALID`,
+`CHAT_INVALID` (422), `OWNER_ONLY` (403).
+
+Quy tắc thông báo: người thực hiện không tự nhận thông báo; người nhận phải còn là thành viên dự án; một thao tác gửi tối đa một
+thông báo cho mỗi người (ví dụ vừa được giao vừa được nhắc tên chỉ nhận thông báo “giao việc”). Thông báo được ghi trong cùng giao
+dịch với thao tác gốc, nên thao tác lỗi thì cũng không có thông báo.
 
 ## 7. Giao diện (bản 2.0)
 

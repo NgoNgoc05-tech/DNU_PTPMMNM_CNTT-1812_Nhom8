@@ -194,6 +194,44 @@ try {
   const csv = (await import('node:fs')).readFileSync(csvPath, 'utf8');
   check(csv.includes('E2E: bản sửa ở tab 2') && csv.includes('Chưa xử lý') && csv.includes('X (px ảnh gốc)'), 's2-export-has-content-position-status');
 
+  // Bản 2.1: xoá phiên bản tải nhầm (bản vừa tải ở tình huống 2)
+  await designer.goto(`${BASE}/screen.php?id=${item.screen_id}`);
+  const pillsBefore = await designer.$$eval('.version-pills a', (l) => l.length);
+  await designer.click('summary[aria-label="Thêm thao tác"]');
+  await designer.click('[data-open=dlg-del-version]');
+  await Promise.all([designer.waitForNavigation(), designer.click('#dlg-del-version button[type=submit]')]);
+  const pillsAfter = await designer.$$eval('.version-pills a', (l) => l.length);
+  check(pillsAfter === pillsBefore - 1, 'v21-delete-wrong-version', `${pillsBefore}->${pillsAfter}`);
+
+  // Bản 2.1: hạn xử lý nhập theo ngày/tháng/năm
+  await designer.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
+  await designer.waitForSelector('.props .date-field input');
+  const saved = designer.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await designer.fill('.props .date-field input', '05/11/2030');
+  await designer.press('.props .date-field input', 'Enter');
+  const dueItem = (await (await saved).json()).item;
+  check(dueItem.due_date === '2030-11-05', 'v21-due-date-dd-mm-yyyy', String(dueItem.due_date));
+
+  // Bản 2.1: @nhắc tên -> người được nhắc thấy thông báo ở chuông
+  await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
+  await r.waitForSelector('textarea[aria-label="Trả lời"]');
+  await r.fill('textarea[aria-label="Trả lời"]', 'E2E: @Nguyễn Thu Trang kiểm tra giúp');
+  await r.click('button:has-text("Gửi trả lời")');
+  await r.waitForSelector('.reply:has-text("E2E: @Nguyễn")');
+  await designer.goto(`${BASE}/projects.php`);
+  check(!(await designer.$eval('#notif-count', (n) => n.hidden)), 'v21-bell-shows-unread');
+  await designer.click('#notif-menu summary');
+  await designer.waitForSelector('.notif-item');
+  check((await designer.textContent('#notif-items')).includes('nhắc tới bạn'), 'v21-mention-notification-listed');
+  await designer.keyboard.press('Escape');
+
+  // Bản 2.1: trợ lý ảo trên trang dự án
+  await designer.click('#chat-open');
+  await designer.fill('#chat-input', 'Làm sao xoá ảnh tải nhầm?');
+  await designer.click('#chat-form button[type=submit]');
+  await designer.waitForSelector('.from-bot:has-text("Xoá phiên bản đang xem")');
+  check(true, 'v21-assistant-answers');
+
   // Lọc trạng thái phía trình duyệt + giao diện tối
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);
   await r.waitForSelector('.ann-list li');

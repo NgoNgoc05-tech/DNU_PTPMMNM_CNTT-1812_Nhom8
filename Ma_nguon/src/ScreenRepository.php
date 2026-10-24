@@ -22,6 +22,38 @@ final class ScreenRepository
         });
     }
 
+    /**
+     * Xoá một phiên bản ảnh tải nhầm: xoá hàng image_versions (CASCADE góp ý, nhận xét, lịch sử của phiên bản đó)
+     * rồi xoá tệp ảnh. Không cho xoá phiên bản duy nhất (khi đó xoá cả màn hình).
+     * @return array{screen_id:int,version_no:int}
+     */
+    public function deleteVersion(int $versionId): array
+    {
+        $v = $this->version($versionId);
+        transaction($this->c, function () use ($v): void {
+            fetchOne($this->c, 'SELECT id FROM screens WHERE id = $1 FOR UPDATE', [$v['screen_id']]);
+            $count = (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM image_versions WHERE screen_id = $1', [$v['screen_id']])['n'];
+            if ($count <= 1) {
+                throw new AppError('LAST_VERSION', 422);
+            }
+            queryParams($this->c, 'DELETE FROM image_versions WHERE id = $1', [$v['id']]);
+        });
+        @unlink(ImageStore::path($v['stored_name']));
+        return ['screen_id' => $v['screen_id'], 'version_no' => $v['version_no']];
+    }
+
+    /** Xoá màn hình cùng mọi phiên bản, góp ý và tệp ảnh của nó. @return int project_id */
+    public function deleteScreen(int $screenId): int
+    {
+        $screen = $this->find($screenId);
+        $files = array_column(fetchAll($this->c, 'SELECT stored_name FROM image_versions WHERE screen_id = $1', [$screenId]), 'stored_name');
+        queryParams($this->c, 'DELETE FROM screens WHERE id = $1', [$screenId]);
+        foreach ($files as $f) {
+            @unlink(ImageStore::path($f));
+        }
+        return (int) $screen['project_id'];
+    }
+
     public function rename(int $screenId, string $name): void
     {
         queryParams($this->c, 'UPDATE screens SET name = $2 WHERE id = $1', [$screenId, cleanName($name)]);

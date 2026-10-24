@@ -80,7 +80,10 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" class="btn btn-sm" data-open="dlg-version"><?= icon('upload') ?>Tải phiên bản mới</button>
 <details class="dropdown"><summary class="btn btn-sm btn-ghost btn-icon" title="Thêm" aria-label="Thêm thao tác"><?= icon('settings') ?></summary>
 <div class="menu menu-right"><button type="button" data-open="dlg-rename"><?= icon('edit') ?>Đổi tên màn hình</button>
-<a href="/export.php?project=<?= (int) $project['id'] ?>&amp;screen=<?= $screenId ?>"><?= icon('download') ?>Xuất CSV màn hình này</a></div></details>
+<a href="/export.php?project=<?= (int) $project['id'] ?>&amp;screen=<?= $screenId ?>"><?= icon('download') ?>Xuất CSV màn hình này</a>
+<hr>
+<?php if (count($versions) > 1): ?><button type="button" class="menu-danger" data-open="dlg-del-version"><?= icon('trash') ?>Xoá phiên bản đang xem (v<?= (int) $current['version_no'] ?>)</button><?php endif; ?>
+<button type="button" class="menu-danger" data-open="dlg-del-screen"><?= icon('trash') ?>Xoá màn hình</button></div></details>
 <?php else: ?>
 <a class="btn btn-sm btn-ghost btn-icon" href="/export.php?project=<?= (int) $project['id'] ?>&amp;screen=<?= $screenId ?>" title="Xuất CSV màn hình này" aria-label="Xuất CSV"><?= icon('download') ?></a>
 <?php endif; ?>
@@ -155,6 +158,33 @@ require __DIR__ . '/../templates/header.php';
 <div class="flash info"><?= icon('layers') ?><span>Góp ý cũ giữ nguyên trên v<?= $latestNo ?>, không bị chuyển sang ảnh mới. Sau khi tải, trang so sánh sẽ mở để bạn đối chiếu và xác nhận.</span></div>
 </div>
 <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close>Huỷ</button><button class="btn" type="submit"><?= icon('upload') ?>Tải lên</button></div>
+</form>
+</dialog>
+<?php if (count($versions) > 1): ?>
+<dialog class="modal" id="dlg-del-version" aria-labelledby="dlg-delv-title">
+<form method="post" action="/delete.php">
+<?= csrfField() ?>
+<input type="hidden" name="what" value="version">
+<input type="hidden" name="version_id" value="<?= (int) $current['id'] ?>">
+<div class="modal-head"><h2 id="dlg-delv-title">Xoá phiên bản v<?= (int) $current['version_no'] ?>?</h2><button type="button" class="btn btn-subtle btn-icon btn-sm" data-close aria-label="Đóng"><?= icon('x') ?></button></div>
+<div class="modal-body">
+<div class="flash error"><?= icon('alert') ?><span>Ảnh v<?= (int) $current['version_no'] ?> (<?= e($current['original_name']) ?>) cùng <strong><?= (int) $current['annotations'] ?> góp ý</strong> trên phiên bản này sẽ bị xoá vĩnh viễn. Các phiên bản khác giữ nguyên.</span></div>
+<p class="hint">Dùng khi tải nhầm ảnh. Không hoàn tác được.</p>
+</div>
+<div class="modal-foot"><button type="button" class="btn btn-ghost" data-close>Huỷ</button><button class="btn btn-danger-solid" type="submit"><?= icon('trash') ?>Xoá phiên bản</button></div>
+</form>
+</dialog>
+<?php endif; ?>
+<dialog class="modal" id="dlg-del-screen" aria-labelledby="dlg-dels-title">
+<form method="post" action="/delete.php">
+<?= csrfField() ?>
+<input type="hidden" name="what" value="screen">
+<input type="hidden" name="screen_id" value="<?= $screenId ?>">
+<div class="modal-head"><h2 id="dlg-dels-title">Xoá màn hình “<?= e($screen['name']) ?>”?</h2><button type="button" class="btn btn-subtle btn-icon btn-sm" data-close aria-label="Đóng"><?= icon('x') ?></button></div>
+<div class="modal-body">
+<div class="flash error"><?= icon('alert') ?><span>Toàn bộ <strong><?= count($versions) ?> phiên bản ảnh</strong> và mọi góp ý, trả lời, lịch sử của màn hình này sẽ bị xoá vĩnh viễn.</span></div>
+</div>
+<div class="modal-foot"><button type="button" class="btn btn-ghost" data-close>Huỷ</button><button class="btn btn-danger-solid" type="submit"><?= icon('trash') ?>Xoá màn hình</button></div>
 </form>
 </dialog>
 <dialog class="modal" id="dlg-rename" aria-labelledby="dlg-rename-title">

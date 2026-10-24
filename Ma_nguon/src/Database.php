@@ -21,6 +21,25 @@ if (is_file($configPath)) {
     }
 }
 
+// Trên dịch vụ đám mây (Render, Railway, Neon…) CSDL thường được cấp bằng một biến DATABASE_URL
+// dạng postgres://user:pass@host:port/dbname?sslmode=require. Tách thành các biến PG* cho libpq.
+$url = getenv('DATABASE_URL');
+if (is_string($url) && $url !== '' && !is_file($configPath)) {
+    $parts = parse_url($url);
+    if ($parts === false || !isset($parts['host'], $parts['path'])) {
+        throw new RuntimeException('DATABASE_URL_INVALID');
+    }
+    putenv('PGHOST=' . $parts['host']);
+    putenv('PGPORT=' . (string) ($parts['port'] ?? 5432));
+    putenv('PGDATABASE=' . ltrim(rawurldecode($parts['path']), '/'));
+    putenv('PGUSER=' . rawurldecode($parts['user'] ?? ''));
+    putenv('PGPASSWORD=' . rawurldecode($parts['pass'] ?? ''));
+    parse_str($parts['query'] ?? '', $query);
+    if (getenv('PGSSLMODE') === false) {
+        putenv('PGSSLMODE=' . (is_string($query['sslmode'] ?? null) ? $query['sslmode'] : 'prefer'));
+    }
+}
+
 function db(): PgSql\Connection
 {
     static $connection = null;

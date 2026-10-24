@@ -66,6 +66,12 @@ final class Seeder
                 }
                 $annotations[] = $a['id'];
             }
+            // Thông báo sinh ra khi nạp dữ liệu: chỉ để 3 thông báo mới nhất của mỗi người ở trạng thái chưa đọc.
+            queryParams($c,
+                'UPDATE notifications SET read_at = now() WHERE user_id = ANY($1::bigint[]) AND id NOT IN (
+                   SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY user_id ORDER BY id DESC) AS rn
+                                     FROM notifications WHERE user_id = ANY($1::bigint[])) t WHERE rn <= 3)',
+                ['{' . implode(',', $users) . '}']);
             return ['users' => $users, 'projects' => $projects, 'versions' => $versions, 'annotations' => $annotations];
         });
     }

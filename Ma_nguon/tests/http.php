@@ -163,6 +163,32 @@ try {
     [$st, , $html] = $designer->request('GET', '/inbox.php');
     same([$st, str_contains($html, 'Việc của tôi')], [200, true], 'http-inbox-page');
 
+    echo "-- Bản 2.1: xoá, thông báo, trợ lý ảo, hỗ trợ qua HTTP\n";
+    $form = ['Content-Type: application/x-www-form-urlencoded'];
+    $vA2 = $fx['versions']['A|Trang chủ|2'];
+    [$st] = $reviewer->request('POST', '/delete.php', http_build_query(['csrf' => $reviewer->csrf, 'what' => 'version', 'version_id' => $vA2]), $form);
+    same([$st, count((new ScreenRepository($c))->versions($first['screen_id']))], [403, 2], 'http-reviewer-cannot-delete-version');
+    [$st] = $viewer->request('POST', '/delete.php', http_build_query(['csrf' => $viewer->csrf, 'what' => 'screen', 'screen_id' => $annB['screen_id']]), $form);
+    same($st, 404, 'http-outsider-cannot-delete-screen-B');
+    [$st] = $designer->request('POST', '/delete.php', http_build_query(['what' => 'version', 'version_id' => $vA2]), $form);
+    same($st, 403, 'http-delete-needs-csrf');
+    [$st, , $body] = $designer->request('GET', '/api.php?action=notifications');
+    $nb = json_decode($body, true);
+    same([$st, is_int($nb['unread'] ?? null), isset($nb['items'])], [200, true, true], 'http-notifications-api');
+    [$st, , $body] = $designer->api(['action' => 'notif_read', 'id' => 0]);
+    [, , $body2] = $designer->request('GET', '/api.php?action=notifications');
+    same([$st, json_decode($body2, true)['unread'] ?? -1], [200, 0], 'http-mark-all-read');
+    [$st, , $body] = $viewer->api(['action' => 'chat', 'message' => 'Làm sao xoá ảnh tải nhầm?']);
+    same([$st, json_decode($body, true)['topic'] ?? ''], [200, 'Xoá ảnh tải nhầm'], 'http-chat-assistant');
+    [$st] = $anon->request('POST', '/api.php', json_encode(['action' => 'chat', 'message' => 'x']), ['Content-Type: application/json']);
+    same($st, 401, 'http-chat-requires-login');
+    [$st, , $html] = $viewer->request('POST', '/help.php', http_build_query(['csrf' => $viewer->csrf, 'action' => 'create', 'category' => 'BUG',
+        'subject' => '<b>Lỗi</b> tải ảnh', 'message' => 'Mô tả']), $form);
+    [, , $html] = $viewer->request('GET', '/help.php');
+    same([$st, str_contains($html, '&lt;b&gt;Lỗi&lt;/b&gt; tải ảnh')], [303, true], 'http-support-ticket-escaped');
+    [$st] = $viewer->request('GET', '/profile.php');
+    same($st, 200, 'http-profile-page');
+
     $boundary = 'pinpointboundary';
     $multipart = "--$boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{$designer->csrf}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"screen_id\"\r\n\r\n{$first['screen_id']}\r\n"

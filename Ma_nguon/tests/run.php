@@ -71,6 +71,16 @@ same(eventText(['kind' => 'ASSIGNEE', 'old_value' => '', 'new_value' => '<script
 same(count(Export::HEADER), 22, 'export-22-columns');
 same(array_keys(AnnotationRepository::PRIORITIES), ['LOW', 'MEDIUM', 'HIGH', 'URGENT'], 'priority-levels');
 
+echo "-- Bản 2.1: trợ lý ảo (chạy trên máy, không cần mạng)\n";
+same(Assistant::fold('Xoá ẢNH tải nhầm?'), 'xoa anh tai nham', 'assistant-fold-vietnamese');
+same(Assistant::local('Làm sao xoá ảnh tải nhầm?')['topic'], 'Xoá ảnh tải nhầm', 'assistant-delete-image');
+same(Assistant::local('so sánh 2 phiên bản')['topic'], 'So sánh hai phiên bản', 'assistant-compare');
+same(Assistant::local('mời bạn vào dự án')['topic'], 'Mời thành viên và cấp quyền', 'assistant-invite');
+same(Assistant::local('thời tiết hôm nay')['topic'], '', 'assistant-unknown-question');
+same(Assistant::local('tin tức link')['topic'] !== 'Xuất danh sách', true, 'assistant-whole-word-match');
+throwsCode(fn () => Assistant::answer(str_repeat('a', 501)), 'CHAT_INVALID', 'assistant-question-length');
+same(NotificationRepository::mentionName('Nguyễn Thu Trang (Thiết kế)'), 'Nguyễn Thu Trang', 'mention-name-without-role');
+
 echo "-- Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)\n";
 $tmp = sys_get_temp_dir() . '/pinpoint-unit-' . getmypid();
 @mkdir($tmp);

@@ -12,7 +12,9 @@ viết nhận xét và trao đổi tại đó. Khi người thiết kế tải b
 
 **Bản 2.0** làm lại giao diện theo phong cách các công cụ góp ý thiết kế phổ biến (Figma, Markup.io): ô soạn góp ý nổi ngay cạnh dấu,
 mỗi góp ý có **ưu tiên, nhãn, người phụ trách, hạn và ghi chú xử lý**, thả cảm xúc, @nhắc tên, nhật ký hoạt động đầy đủ, so sánh
-**thanh trượt / chồng mờ**, bảng tổng quan tiến độ, trang “Việc của tôi” và giao diện tối. Xem [CHANGELOG](CHANGELOG.md).
+**thanh trượt / chồng mờ**, bảng tổng quan tiến độ, trang “Việc của tôi” và giao diện tối. **Bản 2.1** thêm thông báo khi được
+@nhắc tên/giao việc, xoá ảnh tải nhầm, hồ sơ cá nhân, trang hỗ trợ khách hàng và trợ lý ảo trả lời câu hỏi về ứng dụng.
+Xem [CHANGELOG](CHANGELOG.md).
 
 ## Chức năng
 
@@ -23,6 +25,7 @@ mỗi góp ý có **ưu tiên, nhãn, người phụ trách, hạn và ghi chú 
 | 3 | Trả lời từng nhận xét, sửa nội dung của mình, **đã xử lý / mở lại**, lọc theo trạng thái và người góp ý | **Ghi chú xử lý**, cảm xúc, @nhắc tên, lọc ưu tiên/nhãn/“giao cho tôi”, tìm kiếm, sắp xếp | `screen.php` |
 | 4 | Tải phiên bản mới, giữ ảnh cũ cùng góp ý; **đặt hai phiên bản cạnh nhau**; ghi nhận phiên bản dùng để kiểm tra sau sửa | Chế độ **thanh trượt** và **chồng mờ** | `compare.php` |
 | 5 | **Lưu lịch sử**, tìm góp ý chưa xử lý, **xuất CSV** gồm nội dung, vị trí, người viết, trạng thái, phiên bản | Nhật ký mọi thay đổi, “Việc của tôi”, lọc quá hạn, CSV 22 cột, in/PDF | `issues.php`, `inbox.php`, `export.php` |
+| + | Tiện ích người dùng (bản 2.1) | Thông báo @nhắc tên / giao việc / trả lời, xoá ảnh tải nhầm, hồ sơ, hỗ trợ khách hàng, trợ lý ảo | `notifications.php`, `delete.php`, `profile.php`, `help.php` |
 
 Hai yêu cầu kỹ thuật:
 
@@ -66,6 +69,7 @@ bash lab.sh e2e           # trình duyệt thật: 2 tình huống + phép thử
 | ![Tổng quan dự án](Hinh_anh/project.png) | ![Ô soạn góp ý nổi](Hinh_anh/composer.png) |
 | ![Ghi chú xử lý và trao đổi](Hinh_anh/note.png) | ![So sánh thanh trượt](Hinh_anh/swipe.png) |
 | ![Tìm góp ý](Hinh_anh/issues.png) | ![Giao diện tối](Hinh_anh/dark.png) |
+| ![Thông báo khi được @nhắc tên](Hinh_anh/notifications.png) | ![Hỗ trợ và trợ lý ảo](Hinh_anh/help.png) |
 
 ## Tài liệu
 
@@ -88,8 +92,9 @@ Ma_nguon/
 ├── database/              schema.sql, seed-data.php (dữ liệu có đáp án), fixtures/ (12 ảnh)
 ├── public/                trang web (document root): login, projects, project, screen, compare, issues, export, api, image, calibration
 │   ├── inbox.php, project_edit.php   Việc của tôi; sửa dự án / đổi tên màn hình (bản 2.0)
+│   ├── notifications.php, delete.php, profile.php, help.php   Thông báo, xoá, hồ sơ, hỗ trợ (bản 2.1)
 │   └── assets/js/         coords.js (toạ độ), annotator.js (khung ảnh), thread.js (bảng góp ý), screen.js, compare.js, ui.js, theme-init.js
-├── src/                   Database, Access (quyền), Coordinates, ImageStore, *Repository, Export, Seeder, View (hiển thị dùng chung)
+├── src/                   Database, Access (quyền), Coordinates, ImageStore, *Repository, Export, Seeder, View (hiển thị dùng chung), NotificationRepository, SupportRepository, Assistant (trợ lý ảo)
 ├── templates/             header.php, footer.php
 ├── tests/                 run.php, js/, integration.php, http.php, e2e/browser.mjs
 └── tools/                 db-config, db-check, setup, reset, sql, make_fixtures.py

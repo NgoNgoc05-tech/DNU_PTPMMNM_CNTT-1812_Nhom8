@@ -71,10 +71,10 @@ bash lab.sh test
 
 | Phần | Tệp | Kết quả cần có |
 |---|---|---|
-| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=48 FAILED=0` |
+| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=56 FAILED=0` |
 | JavaScript toạ độ | tests/js/coords.test.mjs | `# pass 6`, `# fail 0` |
-| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0 | tests/integration.php | `TESTS=73 FAILED=0` |
-| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0 | tests/http.php | `TESTS=27 FAILED=0` |
+| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0/2.1 | tests/integration.php | `TESTS=95 FAILED=0` |
+| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0/2.1 | tests/http.php | `TESTS=36 FAILED=0` |
 | Tổng | | `KET_QUA=TAT_CA_DAT` |
 
 Bộ tích hợp và bộ HTTP tự nạp một bộ dữ liệu riêng (email có hậu tố ngẫu nhiên), rồi tự xoá khi chạy xong. Dữ liệu demo không bị ảnh hưởng.
@@ -86,7 +86,7 @@ Kiểm thử trên trình duyệt thật (tuỳ chọn, cũng chạy tự độn
 npm install
 npx playwright install chromium
 bash lab.sh run          # terminal 1
-bash lab.sh e2e          # terminal 2 → TESTS=26 FAILED=0
+bash lab.sh e2e          # terminal 2 → TESTS=31 FAILED=0
 ```
 
 Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể `bash lab.sh reset` để đưa dữ liệu demo về ban đầu.
@@ -120,6 +120,21 @@ Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể
    trạng thái, người góp ý, ưu tiên, nhãn, người phụ trách, quá hạn. Bấm **Xuất CSV** (22 cột: nội dung, vị trí, người viết, trạng thái,
    phiên bản, ưu tiên, nhãn, phụ trách, hạn, ghi chú, phiên bản kiểm tra sau sửa…) hoặc **In / PDF**.
 
+### Tình huống 3 (bản 2.1) — Thông báo, xoá ảnh tải nhầm, hỗ trợ
+
+1. **reviewer** mở một góp ý, trả lời có `@Nguyễn Thu Trang`. Ở cửa sổ **designer**, biểu tượng 🔔 hiện số đỏ; bấm vào để xem
+   “Lê Minh Đức nhắc tới bạn”, bấm thông báo để mở đúng góp ý. Giao việc cho ai, người đó cũng nhận thông báo.
+2. **designer** tải nhầm một ảnh làm phiên bản mới → bấm ⚙ trên thanh công cụ → **Xoá phiên bản đang xem** → xác nhận. Phiên bản và
+   góp ý trên nó bị xoá, các phiên bản khác giữ nguyên.
+3. Ở ô **Hạn xử lý** gõ `05/11/2026` (ngày/tháng/năm) hoặc bấm biểu tượng lịch.
+4. Bấm **Hỏi trợ lý** ở góc phải dưới, hỏi “làm sao so sánh hai phiên bản?”. Vào **Hỗ trợ** để xem câu hỏi thường gặp và gửi yêu cầu;
+   người hỗ trợ trả lời bằng `php tools/support.php list` rồi `php tools/support.php reply <số> "nội dung"`.
+5. Bấm ảnh đại diện → **Hồ sơ của tôi** để đổi tên, chức danh, mật khẩu.
+
+**Trợ lý ảo dùng AI (không bắt buộc):** mặc định trợ lý trả lời bằng cơ sở tri thức chạy trên máy (không cần mạng). Muốn dùng mô hình
+AI, đặt biến môi trường `PINPOINT_AI_KEY` (khoá API Anthropic) trước khi `bash lab.sh run`, ví dụ `PINPOINT_AI_KEY=... bash lab.sh run`;
+trên Render thêm biến này ở mục Environment Variables. Chỉ câu hỏi của người dùng được gửi đi, không gửi dữ liệu dự án.
+
 ### Mẹo khi trình diễn
 
 - Bấm biểu tượng 🌙 ở góc trên để chuyển giao diện tối; bấm biểu tượng bàn phím (hoặc phím `?`) để xem phím tắt.
@@ -130,13 +145,27 @@ Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể
 
 | Phép thử | Cách xem trực tiếp |
 |---|---|
-| 1. Toạ độ | Mở menu **Phép thử toạ độ** (`/calibration.php`). Bốn khung (500×250, có lề, lề trái/phải, phóng to 200%) đều hiện **ĐẠT**. Ở trình xem, phóng to, thu nhỏ và đổi kích thước cửa sổ: dấu #1 luôn ở tâm nút |
+| 1. Toạ độ | Mở `/calibration.php` (trang **Hỗ trợ** → *Phép thử toạ độ*). Bốn khung (500×250, có lề, lề trái/phải, phóng to 200%) đều hiện **ĐẠT**. Ở trình xem, phóng to, thu nhỏ và đổi kích thước cửa sổ: dấu #1 luôn ở tâm nút |
 | 2. Vùng | Tạo một vùng, tải lại trang (F5), mở lại: vị trí, kích thước và nội dung giữ nguyên. Cột *Vị trí* trong trang Tìm góp ý cũng hiển thị đúng |
 | 3. Phiên bản | Bấm nút **v1 / v2** trên thanh công cụ: v1 vẫn có đủ dấu, v2 chỉ có dấu của v2 |
 | 4. Quyền | Đăng nhập viewer, dán URL `/screen.php?id=4` (màn hình của dự án B) hoặc `/image.php?id=7` → “Không tìm thấy” |
 | 5. Đồng thời | Mở cùng một góp ý ở hai tab và bấm *Sửa* (nhận xét) hoặc *Sửa ghi chú* ở cả hai. Lưu ở tab 2 trước, rồi lưu ở tab 1: ứng dụng báo **Xung đột**, hiện nội dung mới nhất và vẫn giữ chữ bạn đã gõ |
 
-## 7. Lỗi thường gặp
+## 7. Đưa lên mạng bằng Render (không bắt buộc)
+
+GitHub Pages chỉ phát tệp tĩnh, không chạy được PHP/PostgreSQL. Muốn có đường link online, dùng dịch vụ hỗ trợ Docker như Render.
+Kho mã đã có sẵn `Dockerfile` và `Ma_nguon/tools/docker-start.sh`.
+
+1. Trên Render chọn **New → Postgres**, gói **Free**, tạo xong mở trang CSDL và copy **Internal Database URL**.
+2. **New → Web Service**, chọn repo GitHub của nhóm. **Language: Docker**, **Branch: main**, **Instance Type: Free**.
+3. Mục **Environment Variables** thêm `DATABASE_URL` = địa chỉ vừa copy. Bấm **Deploy web service**.
+4. Khi log hiện `SEED=OK` và `Development Server ... started`, mở địa chỉ `https://<ten-dich-vu>.onrender.com`.
+
+Lưu ý: gói miễn phí tự ngủ khi không có truy cập (lần mở đầu chờ khoảng 1 phút) và ổ đĩa bị xoá khi khởi động lại, nên mỗi lần
+khởi động ứng dụng **nạp lại dữ liệu demo** (`PINPOINT_RESET_ON_START=1`). Chính sách gói miễn phí của Render có thể thay đổi;
+kiểm tra trang giá của Render trước khi dùng. Khi trình diễn trên lớp vẫn nên chạy bản trên máy (`bash lab.sh run`).
+
+## 8. Lỗi thường gặp
 
 | Hiện tượng | Cách xử lý |
 |---|---|

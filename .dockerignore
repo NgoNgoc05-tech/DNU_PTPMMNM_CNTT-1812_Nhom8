@@ -1,0 +1,6 @@
+.git
+Ma_nguon/.local
+Ma_nguon/node_modules
+Ma_nguon/tests/e2e/out
+Ma_nguon/storage/uploads/*
+*.docx

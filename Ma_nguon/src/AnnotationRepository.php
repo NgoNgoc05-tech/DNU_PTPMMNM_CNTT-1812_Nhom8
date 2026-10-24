@@ -59,6 +59,9 @@ final class AnnotationRepository
                 "INSERT INTO status_history (annotation_id, from_status, to_status, changed_by, checked_version_id, note)
                  VALUES ($1, NULL, 'OPEN', $2, $3, 'Tạo góp ý')", [$annotationId, $userId, $versionId]);
             $this->event($annotationId, $userId, 'CREATED', '', $pos['shape'], mb_substr($body, 0, 200));
+            $n = new NotificationRepository($this->c);
+            $sent = isset($m['assignee_id']) ? $n->notify([$m['assignee_id']], $userId, 'ASSIGNED', $annotationId, $body) : [];
+            $n->notify($n->mentionedMembers((int) $version['project_id'], $body), $userId, 'MENTION', $annotationId, $body, $sent);
             return $this->find($annotationId);
         });
     }
@@ -67,7 +70,10 @@ final class AnnotationRepository
     {
         $body = cleanBody($body);
         return transaction($this->c, function () use ($annotationId, $body, $userId): array {
-            $root = fetchOne($this->c, 'SELECT id FROM comments WHERE annotation_id = $1 AND parent_id IS NULL', [$annotationId]);
+            $root = fetchOne($this->c,
+                'SELECT c.id, a.created_by, a.assignee_id, s.project_id FROM comments c JOIN annotations a ON a.id = c.annotation_id
+                   JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+                  WHERE c.annotation_id = $1 AND c.parent_id IS NULL', [$annotationId]);
             if ($root === null) {
                 throw new AppError('NOT_FOUND', 404);
             }
@@ -75,6 +81,9 @@ final class AnnotationRepository
                 'INSERT INTO comments (annotation_id, parent_id, author_id, body) VALUES ($1, $2, $3, $4) RETURNING id',
                 [$annotationId, (int) $root['id'], $userId, $body]);
             $this->event($annotationId, $userId, 'REPLIED', '', '', mb_substr($body, 0, 200));
+            $n = new NotificationRepository($this->c);
+            $sent = $n->notify($n->mentionedMembers((int) $root['project_id'], $body), $userId, 'MENTION', $annotationId, $body);
+            $n->notify([(int) $root['created_by'], (int) ($root['assignee_id'] ?? 0)], $userId, 'REPLY', $annotationId, $body, $sent);
             return ['id' => (int) $row['id']];
         });
     }
@@ -158,6 +167,9 @@ final class AnnotationRepository
                 [$annotationId, $current['status'], $to, $userId, $checked, $note]);
             $this->event($annotationId, $userId, 'STATUS', $current['status'], $to,
                 'v' . (int) $sameScreen['version_no'] . ($note !== '' ? ' — ' . $note : ''));
+            $author = (int) fetchOne($this->c, 'SELECT created_by FROM annotations WHERE id = $1', [$annotationId])['created_by'];
+            (new NotificationRepository($this->c))->notify([$author], $userId, 'STATUS', $annotationId,
+                ($to === 'RESOLVED' ? 'Đã xử lý (kiểm tra trên v' . (int) $sameScreen['version_no'] . ')' : 'Mở lại') . ($note !== '' ? ': ' . $note : ''));
             return ['id' => $annotationId, 'status' => $to, 'lock_version' => (int) $row['lock_version']];
         });
     }
@@ -224,6 +236,10 @@ final class AnnotationRepository
             foreach ($diff as $field => [$old, $value]) {
                 $this->event($annotationId, $userId, $kinds[$field],
                     $this->display($field, $old), $this->display($field, $value));
+            }
+            if (isset($diff['assignee_id']) && $diff['assignee_id'][1] !== null) {
+                $body = (string) fetchOne($this->c, 'SELECT body FROM comments WHERE annotation_id = $1 AND parent_id IS NULL', [$annotationId])['body'];
+                (new NotificationRepository($this->c))->notify([(int) $diff['assignee_id'][1]], $userId, 'ASSIGNED', $annotationId, $body);
             }
             return $this->find($annotationId);
         });

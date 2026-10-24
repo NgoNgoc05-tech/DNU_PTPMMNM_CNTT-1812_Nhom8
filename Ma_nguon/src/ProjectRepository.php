@@ -63,6 +63,24 @@ final class ProjectRepository
             [$projectId, cleanName($name, 150), mb_substr(trim($description), 0, 2000)]);
     }
 
+    /** Xoá dự án (chỉ người tạo). Phải gõ đúng tên dự án để xác nhận; xoá cả tệp ảnh. */
+    public function delete(int $projectId, int $userId, string $confirmName): void
+    {
+        $p = $this->find($projectId);
+        if ((int) $p['created_by'] !== $userId) {
+            throw new AppError('OWNER_ONLY', 403);
+        }
+        if (trim($confirmName) !== $p['name']) {
+            throw new AppError('CONFIRM_MISMATCH', 422);
+        }
+        $files = array_column(fetchAll($this->c,
+            'SELECT v.stored_name FROM image_versions v JOIN screens s ON s.id = v.screen_id WHERE s.project_id = $1', [$projectId]), 'stored_name');
+        queryParams($this->c, 'DELETE FROM projects WHERE id = $1', [$projectId]);
+        foreach ($files as $f) {
+            @unlink(ImageStore::path($f));
+        }
+    }
+
     public function members(int $projectId): array
     {
         return fetchAll($this->c,

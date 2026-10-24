@@ -176,6 +176,17 @@ require __DIR__ . '/../templates/header.php';
 </div>
 <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close>Huỷ</button><button class="btn" type="submit">Lưu</button></div>
 </form>
+<?php if ((int) $project['created_by'] === $user['id']): ?>
+<form method="post" action="/delete.php" class="danger-zone">
+<?= csrfField() ?>
+<input type="hidden" name="what" value="project">
+<input type="hidden" name="project_id" value="<?= $projectId ?>">
+<h3><?= icon('alert') ?>Vùng nguy hiểm — xoá dự án</h3>
+<p class="hint">Xoá vĩnh viễn dự án, mọi màn hình, ảnh, góp ý và lịch sử. Gõ đúng tên dự án <strong><?= e($project['name']) ?></strong> để xác nhận.</p>
+<div class="row"><div class="grow"><input name="confirm_name" type="text" required aria-label="Gõ lại tên dự án để xác nhận" placeholder="<?= e($project['name']) ?>"></div>
+<button class="btn btn-danger-solid" type="submit"><?= icon('trash') ?>Xoá dự án</button></div>
+</form>
+<?php endif; ?>
 </dialog>
 <?php endif; ?>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

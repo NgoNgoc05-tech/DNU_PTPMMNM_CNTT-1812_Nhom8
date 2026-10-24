@@ -155,3 +155,34 @@ CREATE TABLE IF NOT EXISTS annotation_events (
 );
 CREATE INDEX IF NOT EXISTS annotation_events_annotation ON annotation_events (annotation_id, id);
 CREATE INDEX IF NOT EXISTS annotations_assignee ON annotations (assignee_id) WHERE assignee_id IS NOT NULL;
+
+-- ===================== Phiên bản 2.1: thông báo, hỗ trợ khách hàng, hồ sơ =====================
+
+-- Thông báo cho người dùng: được @nhắc tên, được giao việc, có trả lời mới, góp ý của mình đổi trạng thái.
+CREATE TABLE IF NOT EXISTS notifications (
+    id            bigserial PRIMARY KEY,
+    user_id       bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_id      bigint REFERENCES users(id) ON DELETE SET NULL,
+    kind          varchar(10) NOT NULL CHECK (kind IN ('MENTION', 'ASSIGNED', 'REPLY', 'STATUS')),
+    annotation_id bigint REFERENCES annotations(id) ON DELETE CASCADE,
+    body          varchar(300) NOT NULL DEFAULT '',
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    read_at       timestamptz
+);
+CREATE INDEX IF NOT EXISTS notifications_user_unread ON notifications (user_id, read_at, id DESC);
+
+-- Yêu cầu hỗ trợ khách hàng gửi từ trang Hỗ trợ.
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id         bigserial PRIMARY KEY,
+    user_id    bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category   varchar(10) NOT NULL DEFAULT 'QUESTION' CHECK (category IN ('QUESTION', 'BUG', 'IDEA', 'ACCOUNT')),
+    subject    varchar(150) NOT NULL CHECK (length(trim(subject)) > 0),
+    message    text NOT NULL CHECK (length(trim(message)) BETWEEN 1 AND 4000),
+    status     varchar(10) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'ANSWERED', 'CLOSED')),
+    reply      text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Hồ sơ: chức danh / giới thiệu ngắn hiển thị cho thành viên cùng dự án.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS title varchar(120) NOT NULL DEFAULT '';

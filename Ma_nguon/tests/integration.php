@@ -176,6 +176,57 @@ try {
     same([array_slice(Export::HEADER, 14, 3), $row[14], $row[19]], [['Ưu tiên', 'Nhãn', 'Người phụ trách'], 'Khẩn cấp', 'D: tăng độ đậm lên #C2410C'], 'v2-export-new-columns');
     pg_close($c2);
 
+    echo "-- Bản 2.1: thông báo, xoá ảnh tải nhầm, hồ sơ, hỗ trợ khách hàng\n";
+    $notes = new NotificationRepository($c);
+    $before = $notes->unreadCount($D);
+    $mn = $repo->create($home1['id'], 'POINT', 300, 300, null, null, 'Nhờ @Nguyễn Thu Trang và @Phạm Gia Huy xem nút này', $R);
+    same($notes->unreadCount($D), $before + 1, 'v21-mention-notifies-designer');
+    same($notes->listFor($V, 1)[0]['kind'] ?? '', 'MENTION', 'v21-mention-notifies-viewer-member');
+    same((int) fetchOne($c, 'SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND annotation_id = $2', [$R, $mn['id']])['n'], 0, 'v21-no-self-notification');
+    $repo->update($mn['id'], ['assignee_id' => $D], $mn['lock_version'], $R);
+    same($notes->listFor($D, 1)[0]['kind'], 'ASSIGNED', 'v21-assign-notifies');
+    $countR = $notes->unreadCount($R);
+    $repo->reply($mn['id'], 'Đã xem, sẽ sửa', $D);
+    same([$notes->unreadCount($R), $notes->listFor($R, 1)[0]['kind']], [$countR + 1, 'REPLY'], 'v21-reply-notifies-author');
+    $lockNow = $repo->find($mn['id'])['lock_version'];
+    $repo->changeStatus($mn['id'], 'RESOLVED', $lockNow, $D);
+    same($notes->listFor($R, 1)[0]['kind'], 'STATUS', 'v21-status-notifies-author');
+    same($notes->markRead($R) >= 2 && $notes->unreadCount($R) === 0, true, 'v21-mark-all-read');
+    same($notes->markRead($D, $notes->listFor($R, 1)[0]['id']), 0, 'v21-cannot-mark-others-notification');
+    // Xoá phiên bản tải nhầm: chỉ phiên bản đó và góp ý của nó biến mất
+    $wrong = $screens->addVersion($home1['screen_id'], ImageStore::fromFile(__DIR__ . '/../database/fixtures/a-gio-hang-v1.jpg'), $D, 'Tải nhầm');
+    $repo->create($wrong['id'], 'POINT', 5, 5, null, null, 'Góp ý trên ảnh tải nhầm', $R);
+    $file = ImageStore::path($wrong['stored_name']);
+    $countVersions = count($screens->versions($home1['screen_id']));
+    $screens->deleteVersion($wrong['id']);
+    same([count($screens->versions($home1['screen_id'])), is_file($file), count($repo->listForVersion($home1['id'])) > 0],
+        [$countVersions - 1, false, true], 'v21-delete-wrong-version-only');
+    $single = $screens->create($A, 'Màn hình thử xoá', ImageStore::fromFile(__DIR__ . '/../database/fixtures/b-ho-so-v1.png'), $D);
+    throwsCode(fn () => $screens->deleteVersion($single['version_id']), 'LAST_VERSION', 'v21-cannot-delete-last-version');
+    same($screens->deleteScreen($single['screen_id']), $A, 'v21-delete-screen');
+    throwsCode(fn () => $screens->find($single['screen_id']), 'NOT_FOUND', 'v21-deleted-screen-gone');
+    $tmpProject = (new ProjectRepository($c))->create('Dự án thử xoá ' . $suffix, '', $D);
+    queryParams($c, "INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'ADMIN')", [$tmpProject, $R]);
+    throwsCode(fn () => (new ProjectRepository($c))->delete($tmpProject, $R, 'Dự án thử xoá ' . $suffix), 'OWNER_ONLY', 'v21-only-owner-deletes-project');
+    throwsCode(fn () => (new ProjectRepository($c))->delete($tmpProject, $D, 'sai tên'), 'CONFIRM_MISMATCH', 'v21-delete-project-needs-name');
+    (new ProjectRepository($c))->delete($tmpProject, $D, 'Dự án thử xoá ' . $suffix);
+    throwsCode(fn () => (new ProjectRepository($c))->find($tmpProject), 'NOT_FOUND', 'v21-project-deleted');
+    // Hồ sơ và mật khẩu
+    Auth::updateProfile($c, $V, 'Phạm Gia Huy', 'Sinh viên năm 3');
+    same(fetchOne($c, 'SELECT title FROM users WHERE id = $1', [$V])['title'], 'Sinh viên năm 3', 'v21-profile-title');
+    throwsCode(fn () => Auth::changePassword($c, $V, 'sai-mat-khau', 'MoiMoi123', 'MoiMoi123'), 'PASSWORD_WRONG', 'v21-password-needs-current');
+    throwsCode(fn () => Auth::changePassword($c, $V, 'Pinpoint@123', 'MoiMoi123', 'KhacNhau1'), 'PASSWORD_MISMATCH', 'v21-password-repeat');
+    Auth::changePassword($c, $V, 'Pinpoint@123', 'MoiMoi123', 'MoiMoi123');
+    same(password_verify('MoiMoi123', fetchOne($c, 'SELECT password_hash FROM users WHERE id = $1', [$V])['password_hash']), true, 'v21-password-changed');
+    // Hỗ trợ khách hàng
+    $support = new SupportRepository($c);
+    $ticket = $support->create($V, 'BUG', 'Không tải được ảnh', 'Ảnh JPEG 3 MB bị từ chối');
+    throwsCode(fn () => $support->create($V, 'BUG', '', 'x'), 'TICKET_INVALID', 'v21-ticket-validated');
+    $support->answer($ticket, 'Ảnh có thể là WebP đổi đuôi. Hãy xuất lại sang JPEG.');
+    same([$support->listFor($V)[0]['status'], count($support->listFor($R))], ['ANSWERED', 0], 'v21-ticket-answered-and-private');
+    $support->close($R, $ticket);
+    same($support->listFor($V)[0]['status'], 'ANSWERED', 'v21-cannot-close-others-ticket');
+
     echo "-- Tìm kiếm và xuất danh sách\n";
     $open = $repo->search($A, 'OPEN');
     same(count(array_filter($open, fn ($a) => $a['status'] !== 'OPEN')), 0, 'search-open-only');

@@ -14,6 +14,9 @@ require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/ProjectRepository.php';
 require_once __DIR__ . '/ScreenRepository.php';
 require_once __DIR__ . '/AnnotationRepository.php';
+require_once __DIR__ . '/NotificationRepository.php';
+require_once __DIR__ . '/SupportRepository.php';
+require_once __DIR__ . '/Assistant.php';
 require_once __DIR__ . '/Export.php';
 require_once __DIR__ . '/Seeder.php';
 
@@ -48,6 +51,13 @@ function errorMessage(string $code): string
         'DUE_DATE_INVALID' => 'Hạn xử lý không hợp lệ (định dạng năm-tháng-ngày).',
         'NOTE_TOO_LONG' => 'Ghi chú tối đa 4000 ký tự.',
         'REACTION_INVALID' => 'Cảm xúc không hợp lệ.',
+        'LAST_VERSION' => 'Đây là phiên bản duy nhất. Hãy xoá cả màn hình nếu muốn bỏ ảnh này.',
+        'OWNER_ONLY' => 'Chỉ người tạo dự án mới được xoá dự án.',
+        'CONFIRM_MISMATCH' => 'Tên xác nhận không khớp. Chưa xoá gì.',
+        'PASSWORD_WRONG' => 'Mật khẩu hiện tại không đúng.',
+        'PASSWORD_MISMATCH' => 'Hai mật khẩu mới không khớp.',
+        'TICKET_INVALID' => 'Hãy nhập tiêu đề (≤ 150 ký tự) và nội dung (≤ 4000 ký tự).',
+        'CHAT_INVALID' => 'Câu hỏi phải từ 1 đến 500 ký tự.',
     ][$code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 

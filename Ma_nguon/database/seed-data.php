@@ -56,7 +56,7 @@ return [
         ['A', 'Trang chủ', 1, 'POINT', 190, 402, null, null, 'R', 'Giá tiền nên đậm hơn để dễ so sánh giữa các món.', [], [],
             ['p'=>'LOW','c'=>'TYPO']],
         ['A', 'Trang chủ', 1, 'RECT', 60, 320, 860, 150, 'R', 'Ba thẻ món chưa có nút thêm nhanh vào giỏ.',
-            [['D', 'Phần này để màn Thực đơn xử lý được không ạ?'], ['R', 'Trang chủ vẫn cần nút thêm nhanh.']],
+            [['D', 'Phần này để màn Thực đơn xử lý được không ạ?'], ['R', 'Trang chủ vẫn cần nút thêm nhanh. @Nguyễn Thu Trang xem giúp nhé.']],
             [['RESOLVED', 'D', 2, 'Đã xem lại trên v2.'], ['OPEN', 'R', 2, 'v2 vẫn chưa có nút thêm nhanh.']],
             ['p'=>'HIGH','c'=>'UX','to'=>'D','due'=>-1,'note'=>'Thống nhất với màn Thực đơn: dùng chung thành phần “Thêm nhanh” (nút + nhỏ ở góc thẻ).','react'=>[['D','EYES']]]],
         ['A', 'Trang chủ', 2, 'POINT', 160, 255, null, null, 'R', 'Nút đã đúng vị trí mới nhưng chữ hơi nhỏ.', [], [],

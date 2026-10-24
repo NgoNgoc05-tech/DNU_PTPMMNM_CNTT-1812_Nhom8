@@ -648,3 +648,98 @@ dialog.modal::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blu
   h1 { font-size: 1.35rem; }
   .props { grid-template-columns: 96px 1fr; }
 }
+
+/* ---------- Bản 2.1: ô ngày dd/mm/yyyy, chuông thông báo, trợ lý ảo, hỗ trợ ---------- */
+.date-field { position: relative; display: inline-flex; align-items: center; width: 100%; max-width: 190px; }
+.date-field input[type=text] { padding-right: 34px; font-variant-numeric: tabular-nums; }
+.date-field input.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, .18); }
+.date-field .date-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--text-3); cursor: pointer;
+  width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; padding: 0; }
+.date-field .date-btn:hover { background: var(--surface-2); color: var(--brand); }
+.date-field .date-btn svg.icon { width: 15px; height: 15px; }
+.date-field .date-native { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+.props .date-field input[type=text] { height: 30px; padding: 3px 32px 3px 8px; font-size: .84rem; border-color: transparent; background-color: transparent; border-radius: 8px; }
+.props .date-field input[type=text]:hover { background-color: var(--surface-2); border-color: var(--line); }
+.props .date-field input[type=text]:focus { background-color: var(--surface); border-color: var(--brand); }
+.composer-pop .cp-meta .date-field { max-width: none; }
+.composer-pop .cp-meta .date-field input[type=text] { height: 30px; padding: 3px 30px 3px 8px; font-size: .8rem; border-radius: 8px; }
+
+.notif-menu > summary { position: relative; }
+.notif-dot { position: absolute; top: 3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: .64rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--surface); }
+.notif-pop { width: 360px; max-width: calc(100vw - 24px); padding: 0; overflow: hidden; }
+.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.notif-head .link-button { font-size: .8rem; }
+#notif-items { max-height: 380px; overflow-y: auto; }
+.notif-item { display: flex; gap: 10px; padding: 10px 14px; color: var(--text); border-bottom: 1px solid var(--line); font-size: .84rem; }
+.notif-item:hover { background: var(--surface-2); text-decoration: none; }
+.notif-item.is-unread { background: color-mix(in srgb, var(--brand-soft) 70%, transparent); }
+.notif-item.is-unread::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex: none; margin-top: 6px; }
+.notif-text { flex: 1; min-width: 0; color: var(--text-2); }
+.notif-text strong { color: var(--text); }
+.notif-text .quote, .notif-main .quote { display: block; margin-top: 3px; color: var(--text); background: var(--surface-2); border-radius: 8px; padding: 4px 8px; overflow-wrap: anywhere; }
+.notif-text time { display: block; color: var(--text-3); font-size: .74rem; margin-top: 2px; }
+.notif-empty { padding: 18px 14px; margin: 0; text-align: center; }
+.notif-all { display: block; text-align: center; padding: 10px; font-weight: 600; font-size: .86rem; }
+.notif-list { list-style: none; margin: 0; padding: 0; }
+.notif-list li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 6px; border-bottom: 1px solid var(--line); }
+.notif-list li:last-child { border-bottom: 0; }
+.notif-list li.is-unread { background: color-mix(in srgb, var(--brand-soft) 60%, transparent); border-radius: 10px; }
+.notif-list form { margin: 0; }
+.notif-main { flex: 1; min-width: 0; font-size: .9rem; }
+.notif-kind { font-weight: 600; }
+.notif-kind.k-MENTION { color: var(--brand); } .notif-kind.k-ASSIGNED { color: var(--warn); } .notif-kind.k-STATUS { color: var(--ok); }
+
+.avatar-xl { width: 64px; height: 64px; font-size: 1.3rem; }
+
+.help-hero { text-align: center; padding: 22px 16px 28px; margin-bottom: 18px; border-radius: var(--radius-lg); color: #fff;
+  background: radial-gradient(700px 300px at 10% 0%, #6366f1, transparent 60%), radial-gradient(600px 300px at 100% 100%, #f97316, transparent 55%), #1e1b4b; }
+.help-hero h1 { font-size: 1.8rem; }
+.help-hero p { color: #c7d2fe; margin: 0; }
+.faq details { border-bottom: 1px solid var(--line); padding: 10px 2px; }
+.faq details:last-child { border-bottom: 0; }
+.faq summary { cursor: pointer; font-weight: 650; }
+.faq details p { margin: 8px 0 2px; color: var(--text-2); font-size: .9rem; }
+.ticket-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.ticket-list li { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.ticket-list form { margin: 0; justify-self: start; }
+.ticket-reply { background: var(--ok-soft); color: var(--ok-ink); border-radius: 10px; padding: 8px 10px; font-size: .88rem; }
+.ticket-reply p { margin: 4px 0 0; color: var(--text); }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+.link-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: .9rem; }
+.link-list a, .link-list span { display: inline-flex; gap: 7px; align-items: center; }
+
+.chat-card { display: flex; flex-direction: column; gap: 10px; }
+.chat-log { display: flex; flex-direction: column; gap: 8px; max-height: 360px; min-height: 160px; overflow-y: auto; padding: 4px 2px; }
+.chat-msg { display: flex; }
+.chat-msg.from-user { justify-content: flex-end; }
+.chat-bubble { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.from-bot .chat-bubble { background: var(--surface-2); border-top-left-radius: 4px; }
+.from-user .chat-bubble { background: var(--brand); color: #fff; border-top-right-radius: 4px; }
+.chat-msg.is-typing .chat-bubble { color: var(--text-3); animation: pulse-text 1s ease-in-out infinite alternate; }
+@keyframes pulse-text { from { opacity: .4; } to { opacity: 1; } }
+.chat-suggest { display: flex; flex-wrap: wrap; gap: 6px; }
+.chat-suggest button { border: 1px solid var(--line); background: var(--surface); color: var(--text-2); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: .78rem; cursor: pointer; }
+.chat-suggest button:hover { border-color: var(--brand); color: var(--brand); }
+.chat-form { display: flex; gap: 8px; margin: 0; }
+.chat-form input { flex: 1; }
+.chat-fab { position: fixed; right: 20px; bottom: 20px; z-index: 70; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px; }
+.chat-fab-btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 700;
+  color: #fff; background: linear-gradient(135deg, var(--brand), #7c3aed); box-shadow: 0 10px 30px -6px rgba(79, 70, 229, .6); }
+.chat-fab-btn:hover { filter: brightness(1.08); }
+.chat-panel { width: 360px; max-width: calc(100vw - 40px); display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-lg); padding: 16px; }
+.chat-panel .chat-log { max-height: 320px; }
+@media print { .chat-fab { display: none !important; } }
+@media (max-width: 760px) { .chat-fab-btn span { display: none; } .chat-fab-btn { width: 46px; padding: 0; justify-content: center; } }
+
+.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger-solid:hover { background: #b91c1c; }
+.menu .menu-danger { color: var(--danger); }
+.menu .menu-danger:hover { background: var(--danger-soft); }
+.danger-zone { margin: 0 20px 20px; padding: 14px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--danger-soft) 40%, var(--surface)); }
+.danger-zone h3 { color: var(--danger); display: flex; align-items: center; gap: 6px; }
+.notif-head strong { white-space: nowrap; }
+.dropdown > .menu.menu-right { min-width: 250px; }
+.link-list li { display: flex; gap: 7px; align-items: flex-start; }
+.link-list a, .link-list span { display: inline; }
+.link-list svg.icon { margin-top: 3px; }

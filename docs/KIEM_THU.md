@@ -4,11 +4,11 @@
 
 | Lệnh | Bộ kiểm thử | Cần | Số ca |
 |---|---|---|---|
-| `php tests/run.php` | Đơn vị: quyền, toạ độ, escape, CSV, giới hạn ảnh, hiển thị dùng chung | PHP | 48 |
+| `php tests/run.php` | Đơn vị: quyền, toạ độ, escape, CSV, giới hạn ảnh, hiển thị dùng chung | PHP | 56 |
 | `node --test tests/js/coords.test.mjs` | Hàm toạ độ JavaScript dùng trong trình duyệt | Node ≥ 18 | 6 |
-| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (bản 2.0) trên PostgreSQL thật | PostgreSQL | 73 |
-| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0 | PostgreSQL | 27 |
-| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối | Máy chủ đang chạy + Playwright | 26 |
+| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (2.0) + thông báo, xoá, hồ sơ, hỗ trợ (2.1) trên PostgreSQL thật | PostgreSQL | 95 |
+| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0 | PostgreSQL | 36 |
+| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối | Máy chủ đang chạy + Playwright | 31 |
 
 `bash lab.sh test` chạy bốn bộ đầu và in `KET_QUA=TAT_CA_DAT` khi tất cả đều đạt. GitHub Actions (`.github/workflows/ci.yml`) chạy cả năm bộ
 trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Request.
@@ -36,12 +36,13 @@ trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Requ
 | 7 | Khi mở chi tiết một góp ý, ô tìm kiếm và bộ lọc vẫn hiện | Ảnh chụp giao diện (bản 2.0) | Thuộc tính `hidden` bị quy tắc `display: grid` của `.panel-head` ghi đè | Thêm quy tắc chung `[hidden] { display: none !important; }` | Chụp lại trình xem; e2e `no-javascript-errors` |
 | 8 | Chạy e2e lần thứ hai thất bại ở bước khoanh vùng | `bash lab.sh e2e` chạy lặp | Góc trên-trái vùng mới trùng dấu của lần chạy trước nên thao tác kéo chọn nhầm dấu cũ | Bài e2e bật nút “Ẩn mọi dấu” trước khi vẽ (dùng chính tính năng mới) | Chạy e2e hai lần liên tiếp: 26/26 đạt cả hai |
 | 9 | Menu tài khoản và menu “Thêm thao tác” bị kéo dãn hết chiều ngang | Ảnh chụp giao diện (bản 2.0) | Hai quy tắc CSS cùng độ ưu tiên đặt cả `left` và `right` | Thêm lớp `menu-right` cho menu căn phải | Chụp lại các trang có menu |
+| 10 | Trang phép thử toạ độ báo “KHÔNG ĐẠT” trên máy thành viên (lệch 0,4 px) | Thành viên chạy thử trên Windows phóng to 125% | Trang đo tâm dấu bằng `getBoundingClientRect`, giá trị bị làm tròn tới pixel thiết bị; dấu thực ra vẫn đúng (đổi ngược ≈ 749,2; 149,2) | So sánh bằng toạ độ CSS mà trình xem đặt cho dấu (`style.left/top`); vị trí thật trên màn hình vẫn được e2e kiểm tra với sai số ≤ 1 px | e2e `t1-calibration-page-4-cases`, `t1-viewer-*` |
 
-## 4. Kết quả lần chạy cuối (bản 2.0, 24/10/2026)
+## 4. Kết quả lần chạy cuối (bản 2.1, 24/10/2026)
 
 Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từng bộ kiểm thử.
 
-### Đơn vị — `tests/run.php` (TESTS=48 FAILED=0)
+### Đơn vị — `tests/run.php` (TESTS=56 FAILED=0)
 
 **Phân quyền (ma trận VIEW / COMMENT / ADMIN)**: `view-can-view`, `view-cannot-comment`, `comment-can-comment`, `comment-cannot-manage`, `admin-can-comment`, `non-member-denied`, `unknown-role-denied`
 
@@ -53,13 +54,15 @@ Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từn
 
 **Bản 2.0: hiển thị dùng chung (ảnh đại diện, nhật ký, cột xuất)**: `initials-vietnamese-name`, `initials-single-word`, `avatar-escaped-and-colored`, `event-text-escaped`, `export-22-columns`, `priority-levels`
 
+**Bản 2.1: trợ lý ảo (chạy trên máy, không cần mạng)**: `assistant-fold-vietnamese`, `assistant-delete-image`, `assistant-compare`, `assistant-invite`, `assistant-unknown-question`, `assistant-whole-word-match`, `assistant-question-length`, `mention-name-without-role`
+
 **Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)**: `png-accepted`, `jpeg-accepted`, `gif-rejected`, `fake-png-rejected`, `over-5mb-rejected`, `tiny-rejected`, `stored-name-path-traversal`, `non-uploaded-path-rejected`
 
 ### JavaScript — `tests/js/coords.test.mjs` (pass 6, fail 0)
 
 fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomAround giữ điểm dưới con trỏ, trường hợp phóng to 200%.
 
-### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=73 FAILED=0)
+### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=95 FAILED=0)
 
 **Dữ liệu mẫu có đáp án**: `seed-20-annotations`, `seed-11-points`, `seed-9-rects`, `seed-13-open`, `seed-12-image-versions`, `seed-3-roles`
 
@@ -75,15 +78,19 @@ fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomArou
 
 **Bản 2.0: thuộc tính, ghi chú xử lý, cảm xúc, nhật ký hoạt động**: `v2-stats-total-open-overdue`, `v2-seed-notes-project-A`, `v2-create-with-meta`, `v2-assignee-must-be-member`, `v2-priority-whitelist`, `v2-due-date-validated`, `v2-note-length-limit`, `v2-note-saved`, `v2-stale-note-conflict`, `v2-status-shares-lock-with-note`, `v2-note-not-overwritten`, `v2-update-clear-assignee-and-due`, `v2-events-logged-in-order`, `v2-two-people-react`, `v2-reaction-toggle-off`, `v2-reaction-whitelist`, `v2-filter-priority`, `v2-filter-overdue`, `v2-search-matches-note`, `v2-filter-unassigned`, `v2-sort-priority`, `v2-my-tasks-overdue`, `v2-project-activity-newest-first`, `v2-resolved-on-version`, `v2-export-new-columns`
 
+**Bản 2.1: thông báo, xoá ảnh tải nhầm, hồ sơ, hỗ trợ khách hàng**: `v21-mention-notifies-designer`, `v21-mention-notifies-viewer-member`, `v21-no-self-notification`, `v21-assign-notifies`, `v21-reply-notifies-author`, `v21-status-notifies-author`, `v21-mark-all-read`, `v21-cannot-mark-others-notification`, `v21-delete-wrong-version-only`, `v21-cannot-delete-last-version`, `v21-delete-screen`, `v21-deleted-screen-gone`, `v21-only-owner-deletes-project`, `v21-delete-project-needs-name`, `v21-project-deleted`, `v21-profile-title`, `v21-password-needs-current`, `v21-password-repeat`, `v21-password-changed`, `v21-ticket-validated`, `v21-ticket-answered-and-private`, `v21-cannot-close-others-ticket`
+
 **Tìm kiếm và xuất danh sách**: `search-open-only`, `search-by-text`, `search-percent-is-literal`, `filter-by-author`, `export-header`, `export-row-count`
 
-### HTTP — `tests/http.php` (TESTS=27 FAILED=0)
+### HTTP — `tests/http.php` (TESTS=36 FAILED=0)
 
 `http-anonymous-api-401`, `http-anonymous-image-denied`, `http-viewer-reads-image-A`, `http-viewer-cannot-read-image-B-by-url`, `http-viewer-cannot-read-comments-B-by-url`, `http-viewer-cannot-open-screen-B`, `http-viewer-cannot-export-B`, `http-viewer-cannot-create`, `http-viewer-cannot-reply`, `http-viewer-cannot-change-status`, `http-missing-csrf-rejected`, `http-comment-stored-literally`, `http-comment-rendered-as-text`, `http-csp-header`, `http-outside-image-422`, `http-export-csv`
 
-**Bản 2.0: thuộc tính, ghi chú, cảm xúc, nhật ký qua HTTP**: `http-viewer-cannot-edit-note`, `http-viewer-cannot-react`, `http-viewer-cannot-read-activity-B`, `http-reviewer-updates-priority-and-note`, `http-stale-update-conflict-409`, `http-reviewer-reacts`, `http-invalid-reaction-422`, `http-activity-newest-first`, `http-reviewer-cannot-rename-project`, `http-inbox-page`, `http-fake-image-upload-rejected`
+**Bản 2.0: thuộc tính, ghi chú, cảm xúc, nhật ký qua HTTP**: `http-viewer-cannot-edit-note`, `http-viewer-cannot-react`, `http-viewer-cannot-read-activity-B`, `http-reviewer-updates-priority-and-note`, `http-stale-update-conflict-409`, `http-reviewer-reacts`, `http-invalid-reaction-422`, `http-activity-newest-first`, `http-reviewer-cannot-rename-project`, `http-inbox-page`
 
-### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=26 FAILED=0)
+**Bản 2.1: xoá, thông báo, trợ lý ảo, hỗ trợ qua HTTP**: `http-reviewer-cannot-delete-version`, `http-outsider-cannot-delete-screen-B`, `http-delete-needs-csrf`, `http-notifications-api`, `http-mark-all-read`, `http-chat-assistant`, `http-chat-requires-login`, `http-support-ticket-escaped`, `http-profile-page`, `http-fake-image-upload-rejected`
 
-`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
+### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=31 FAILED=0)
+
+`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v21-delete-wrong-version`, `v21-due-date-dd-mm-yyyy`, `v21-bell-shows-unread`, `v21-mention-notification-listed`, `v21-assistant-answers`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
 

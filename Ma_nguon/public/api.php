@@ -15,6 +15,9 @@ declare(strict_types=1);
  * POST action=update   {annotation_id, lock_version, [priority], [category], [assignee_id], [due_date], [note]}
  * POST action=react    {comment_id, kind: LIKE|HEART|PARTY|EYES}
  * GET  ?action=activity&project=ID[&screen=ID]   nhật ký hoạt động gần đây
+ * GET  ?action=notifications                     thông báo của tôi + số chưa đọc (bản 2.1)
+ * POST action=notif_read {id (0 = tất cả)}       đánh dấu đã đọc
+ * POST action=chat   {message, history[]}        trợ lý ảo trả lời câu hỏi về ứng dụng
  */
 require __DIR__ . '/../src/bootstrap.php';
 require __DIR__ . '/../src/Session.php';
@@ -41,6 +44,10 @@ try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'GET') {
+        if (field($_GET, 'action') === 'notifications') {
+            $n = new NotificationRepository($c);
+            respond(200, ['unread' => $n->unreadCount($userId), 'items' => $n->listFor($userId, 15)]);
+        }
         if (field($_GET, 'action') === 'activity') {
             $projectId = intField($_GET, 'project');
             Access::require($c, $userId, $projectId, Access::VIEW);
@@ -92,6 +99,10 @@ try {
             $changes = array_intersect_key($input, array_flip(['priority', 'category', 'assignee_id', 'due_date', 'note']));
             $repo->update($annotationId, $changes, (int) ($input['lock_version'] ?? 0), $userId);
             respond(200, ['item' => $repo->find($annotationId, $userId)]);
+        case 'notif_read':
+            respond(200, ['updated' => (new NotificationRepository($c))->markRead($userId, (int) ($input['id'] ?? 0))]);
+        case 'chat':
+            respond(200, Assistant::answer((string) ($input['message'] ?? ''), is_array($input['history'] ?? null) ? $input['history'] : []));
         case 'react':
             $commentId = (int) ($input['comment_id'] ?? 0);
             Access::require($c, $userId, Access::projectOfComment($c, $commentId), Access::COMMENT);

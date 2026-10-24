@@ -18,3 +18,11 @@ Tất cả đều có giấy phép tương thích với MIT.
 
 Ứng dụng **không** dùng framework PHP, thư viện JavaScript hay CDN nào khi chạy. Toàn bộ HTML, CSS và JS trong `public/` do nhóm viết.
 Có thể kiểm tra lại giấy phép gói npm bằng `npm ls --all` hoặc `npx license-checker --summary`.
+
+## Bản 2.1
+
+| Thành phần | Nguồn / giấy phép | Ghi chú |
+|---|---|---|
+| Trợ lý ảo — cơ sở tri thức | Nhóm tự viết (`src/Assistant.php`), MIT | Chạy trên máy, so khớp từ khoá tiếng Việt không dấu |
+| Mô hình AI (tuỳ chọn) | Anthropic Messages API — điều khoản dịch vụ của Anthropic | Chỉ dùng khi đặt `PINPOINT_AI_KEY`; chỉ gửi câu hỏi của người dùng |
+| Ảnh nền Docker `php:8.3-cli` | Docker Official Image, giấy phép PHP | Chỉ dùng khi triển khai bằng `Dockerfile` |

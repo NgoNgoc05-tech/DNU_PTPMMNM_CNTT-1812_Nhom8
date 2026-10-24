@@ -22,7 +22,7 @@ final class Auth
             return null;
         }
         if ($cache === null || (int) $cache['id'] !== (int) $_SESSION['user_id']) {
-            $cache = fetchOne($c, 'SELECT id, email, name FROM users WHERE id = $1', [(int) $_SESSION['user_id']]);
+            $cache = fetchOne($c, 'SELECT id, email, name, title, created_at FROM users WHERE id = $1', [(int) $_SESSION['user_id']]);
         }
         return $cache;
     }
@@ -57,5 +57,31 @@ final class Auth
             'INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id',
             [$email, cleanName($name), password_hash($password, PASSWORD_DEFAULT)]);
         return (int) $row['id'];
+    }
+
+    /** Hồ sơ: đổi họ tên và chức danh. */
+    public static function updateProfile(PgSql\Connection $c, int $userId, string $name, string $title): void
+    {
+        queryParams($c, 'UPDATE users SET name = $2, title = $3 WHERE id = $1',
+            [$userId, cleanName($name), mb_substr(trim($title), 0, 120)]);
+    }
+
+    /** Đổi mật khẩu: phải nhập đúng mật khẩu hiện tại; tạo lại mã phiên sau khi đổi. */
+    public static function changePassword(PgSql\Connection $c, int $userId, string $current, string $new, string $repeat): void
+    {
+        $row = fetchOne($c, 'SELECT password_hash FROM users WHERE id = $1', [$userId]);
+        if ($row === null || !password_verify($current, $row['password_hash'])) {
+            throw new AppError('PASSWORD_WRONG', 422);
+        }
+        if (strlen($new) < 8) {
+            throw new AppError('PASSWORD_TOO_SHORT', 422);
+        }
+        if ($new !== $repeat) {
+            throw new AppError('PASSWORD_MISMATCH', 422);
+        }
+        queryParams($c, 'UPDATE users SET password_hash = $2 WHERE id = $1', [$userId, password_hash($new, PASSWORD_DEFAULT)]);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
     }
 }
