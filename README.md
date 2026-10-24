@@ -99,6 +99,6 @@ Ma_nguon/
 
 | Thành viên | MSSV | Phụ trách chính |
 |---|---|---|
-| Thành viên 1 (nhóm trưởng) | … | CSDL, phân quyền, dự án/thành viên, tải ảnh và phiên bản (`schema.sql`, `Access`, `ProjectRepository`, `ScreenRepository`, `ImageStore`) |
-| Thành viên 2 | … | Trình xem và toạ độ, so sánh hai phiên bản (`coords.js`, `annotator.js`, `screen.js`, `compare.js`, `calibration.php`) |
-| Thành viên 3 | … | Góp ý, trả lời, trạng thái, xung đột, tìm kiếm và xuất CSV, kiểm thử và CI (`AnnotationRepository`, `Export`, `tests/`, `.github/`) |
+| Ngô Văn Ngọc (nhóm trưởng) | 1871020425 | CSDL, phân quyền, dự án/thành viên, tải ảnh và phiên bản (`schema.sql`, `Access`, `ProjectRepository`, `ScreenRepository`, `ImageStore`) |
+| Trần Văn Quý | 1871020489 | Trình xem và toạ độ, so sánh hai phiên bản (`coords.js`, `annotator.js`, `screen.js`, `compare.js`, `calibration.php`) |
+| Khổng Minh Hiếu | 1871020230 | Góp ý, trả lời, trạng thái, xung đột, tìm kiếm và xuất CSV, kiểm thử và CI (`AnnotationRepository`, `Export`, `tests/`, `.github/`) |
