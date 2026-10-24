@@ -1,0 +1,13 @@
+# Cấu hình và dữ liệu chỉ có trên máy cá nhân (mật khẩu CSDL, phiên đăng nhập)
+.local/
+Ma_nguon/.local/
+# Ảnh người dùng tải lên
+Ma_nguon/storage/uploads/*
+!Ma_nguon/storage/uploads/.gitkeep
+# Công cụ kiểm thử trình duyệt
+node_modules/
+Ma_nguon/tests/e2e/out/
+*.log
+.env
+.DS_Store
+Thumbs.db

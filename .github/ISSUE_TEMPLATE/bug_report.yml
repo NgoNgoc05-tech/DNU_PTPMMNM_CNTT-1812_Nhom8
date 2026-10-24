@@ -1,0 +1,16 @@
+name: Báo lỗi
+description: Ứng dụng chạy sai so với mô tả
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes: { label: Mô tả lỗi, description: Điều gì xảy ra và bạn mong đợi điều gì }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Các bước tái hiện, placeholder: "1. Đăng nhập viewer@pinpoint.test\n2. Mở …\n3. Thấy …" }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Tài khoản / quyền đang dùng, placeholder: "reviewer@pinpoint.test (COMMENT)" }
+  - type: textarea
+    attributes: { label: Kết quả bash lab.sh check và bash lab.sh test, render: shell }
+  - type: textarea
+    attributes: { label: Ảnh chụp màn hình }

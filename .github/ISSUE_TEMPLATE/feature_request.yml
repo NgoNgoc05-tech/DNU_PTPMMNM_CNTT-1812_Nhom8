@@ -1,0 +1,12 @@
+name: Đề xuất tính năng
+description: Ý tưởng cải thiện Pinpoint
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes: { label: Vấn đề cần giải quyết }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Giải pháp đề xuất }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Ảnh hưởng tới quyền, dữ liệu hoặc phiên bản ảnh }

@@ -1,0 +1,157 @@
+-- Pinpoint: góp ý trực tiếp trên ảnh thiết kế.
+-- Chạy trong CSDL riêng của nhóm (không dùng CSDL production).
+-- Toạ độ annotation lưu theo PIXEL CỦA ẢNH GỐC (không phải pixel màn hình),
+-- nên không phụ thuộc kích thước hiển thị, mức phóng to hay phần lề trống.
+
+CREATE TABLE IF NOT EXISTS users (
+    id            bigserial PRIMARY KEY,
+    email         varchar(200) NOT NULL UNIQUE CHECK (email = lower(trim(email))),
+    name          varchar(120) NOT NULL CHECK (length(trim(name)) > 0),
+    password_hash varchar(255) NOT NULL,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+    id          bigserial PRIMARY KEY,
+    name        varchar(150) NOT NULL CHECK (length(trim(name)) > 0),
+    description text NOT NULL DEFAULT '',
+    created_by  bigint NOT NULL REFERENCES users(id),
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Bảng trung gian N-N giữa users và projects, kèm quyền.
+-- VIEW: chỉ xem; COMMENT: xem + góp ý/trả lời/đổi trạng thái; ADMIN: quản lý dự án.
+CREATE TABLE IF NOT EXISTS project_members (
+    project_id bigint NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id    bigint NOT NULL REFERENCES users(id),
+    role       varchar(10) NOT NULL CHECK (role IN ('VIEW', 'COMMENT', 'ADMIN')),
+    added_by   bigint REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, user_id)
+);
+
+-- Màn hình thiết kế (Trang chủ, Giỏ hàng...) thuộc một dự án.
+CREATE TABLE IF NOT EXISTS screens (
+    id         bigserial PRIMARY KEY,
+    project_id bigint NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name       varchar(120) NOT NULL CHECK (length(trim(name)) > 0),
+    created_by bigint NOT NULL REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (project_id, name)
+);
+
+-- Mỗi lần tải ảnh tạo một phiên bản mới; phiên bản cũ không bị ghi đè.
+CREATE TABLE IF NOT EXISTS image_versions (
+    id            bigserial PRIMARY KEY,
+    screen_id     bigint NOT NULL REFERENCES screens(id) ON DELETE CASCADE,
+    version_no    integer NOT NULL CHECK (version_no > 0),
+    stored_name   varchar(80) NOT NULL UNIQUE,
+    original_name varchar(255) NOT NULL,
+    mime_type     varchar(20) NOT NULL CHECK (mime_type IN ('image/png', 'image/jpeg')),
+    width         integer NOT NULL CHECK (width > 0),
+    height        integer NOT NULL CHECK (height > 0),
+    byte_size     integer NOT NULL CHECK (byte_size > 0),
+    sha256        char(64) NOT NULL,
+    note          varchar(255) NOT NULL DEFAULT '',
+    uploaded_by   bigint NOT NULL REFERENCES users(id),
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (screen_id, version_no)
+);
+
+-- Dấu vị trí: điểm (POINT) hoặc vùng chữ nhật (RECT), gắn CỐ ĐỊNH với một phiên bản ảnh.
+CREATE TABLE IF NOT EXISTS annotations (
+    id               bigserial PRIMARY KEY,
+    image_version_id bigint NOT NULL REFERENCES image_versions(id) ON DELETE CASCADE,
+    seq_no           integer NOT NULL CHECK (seq_no > 0),
+    shape            varchar(5) NOT NULL CHECK (shape IN ('POINT', 'RECT')),
+    x                numeric(10, 2) NOT NULL CHECK (x >= 0),
+    y                numeric(10, 2) NOT NULL CHECK (y >= 0),
+    w                numeric(10, 2),
+    h                numeric(10, 2),
+    status           varchar(10) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'RESOLVED')),
+    created_by       bigint NOT NULL REFERENCES users(id),
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    updated_at       timestamptz NOT NULL DEFAULT now(),
+    lock_version     integer NOT NULL DEFAULT 1,
+    UNIQUE (image_version_id, seq_no),
+    CHECK ((shape = 'POINT' AND w IS NULL AND h IS NULL)
+        OR (shape = 'RECT' AND w > 0 AND h > 0))
+);
+
+-- Nhận xét gốc (parent_id IS NULL) và các trả lời (parent_id trỏ tới nhận xét gốc).
+CREATE TABLE IF NOT EXISTS comments (
+    id            bigserial PRIMARY KEY,
+    annotation_id bigint NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+    parent_id     bigint REFERENCES comments(id) ON DELETE CASCADE,
+    author_id     bigint NOT NULL REFERENCES users(id),
+    body          text NOT NULL CHECK (length(trim(body)) BETWEEN 1 AND 2000),
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+    lock_version  integer NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS comments_one_root ON comments (annotation_id) WHERE parent_id IS NULL;
+
+-- Lịch sử sửa nội dung nhận xét (giữ bản cũ, không mất dữ liệu).
+CREATE TABLE IF NOT EXISTS comment_revisions (
+    id         bigserial PRIMARY KEY,
+    comment_id bigint NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+    old_body   text NOT NULL,
+    edited_by  bigint NOT NULL REFERENCES users(id),
+    edited_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Lịch sử trạng thái OPEN <-> RESOLVED. checked_version_id ghi nhận phiên bản ảnh
+-- đã được dùng để kiểm tra sau khi sửa (ví dụ: góp ý trên v1, xác nhận trên v2).
+CREATE TABLE IF NOT EXISTS status_history (
+    id                 bigserial PRIMARY KEY,
+    annotation_id      bigint NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+    from_status        varchar(10) CHECK (from_status IN ('OPEN', 'RESOLVED')),
+    to_status          varchar(10) NOT NULL CHECK (to_status IN ('OPEN', 'RESOLVED')),
+    changed_by         bigint NOT NULL REFERENCES users(id),
+    checked_version_id bigint REFERENCES image_versions(id) ON DELETE SET NULL,
+    note               varchar(500) NOT NULL DEFAULT '',
+    created_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS annotations_version_status ON annotations (image_version_id, status);
+CREATE INDEX IF NOT EXISTS comments_annotation ON comments (annotation_id, id);
+CREATE INDEX IF NOT EXISTS status_history_annotation ON status_history (annotation_id, id);
+
+-- ===================== Phiên bản 2.0: thuộc tính góp ý, ghi chú, cảm xúc, nhật ký =====================
+-- Dùng ADD COLUMN IF NOT EXISTS để CSDL tạo từ bản 1.0 nâng cấp được bằng `bash lab.sh setup`.
+
+-- Mức ưu tiên, nhãn phân loại, người phụ trách, hạn xử lý và GHI CHÚ XỬ LÝ của từng góp ý.
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS priority varchar(6) NOT NULL DEFAULT 'MEDIUM'
+    CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT'));
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS category varchar(8) NOT NULL DEFAULT 'OTHER'
+    CHECK (category IN ('LAYOUT', 'COLOR', 'TYPO', 'CONTENT', 'UX', 'A11Y', 'OTHER'));
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS assignee_id bigint REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS due_date date;
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS note text NOT NULL DEFAULT '' CHECK (length(note) <= 4000);
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS note_updated_by bigint REFERENCES users(id);
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS note_updated_at timestamptz;
+
+-- Thả cảm xúc vào nhận xét/trả lời (mỗi người tối đa một lần cho mỗi loại).
+CREATE TABLE IF NOT EXISTS comment_reactions (
+    comment_id bigint NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+    user_id    bigint NOT NULL REFERENCES users(id),
+    kind       varchar(6) NOT NULL CHECK (kind IN ('LIKE', 'HEART', 'PARTY', 'EYES')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (comment_id, user_id, kind)
+);
+
+-- Nhật ký hoạt động của góp ý: mọi thay đổi (tạo, trả lời, sửa, trạng thái, ưu tiên,
+-- nhãn, người phụ trách, hạn, ghi chú) đều được ghi lại, kèm giá trị cũ và mới.
+CREATE TABLE IF NOT EXISTS annotation_events (
+    id            bigserial PRIMARY KEY,
+    annotation_id bigint NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+    actor_id      bigint NOT NULL REFERENCES users(id),
+    kind          varchar(10) NOT NULL CHECK (kind IN ('CREATED', 'REPLIED', 'EDITED', 'STATUS', 'PRIORITY',
+                                                       'CATEGORY', 'ASSIGNEE', 'DUE', 'NOTE')),
+    old_value     varchar(500) NOT NULL DEFAULT '',
+    new_value     varchar(500) NOT NULL DEFAULT '',
+    detail        varchar(500) NOT NULL DEFAULT '',
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS annotation_events_annotation ON annotation_events (annotation_id, id);
+CREATE INDEX IF NOT EXISTS annotations_assignee ON annotations (assignee_id) WHERE assignee_id IS NOT NULL;
