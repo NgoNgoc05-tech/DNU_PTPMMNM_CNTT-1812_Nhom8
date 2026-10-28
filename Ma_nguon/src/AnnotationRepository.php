@@ -410,7 +410,7 @@ final class AnnotationRepository
             'priority' => self::PRIORITIES[$value] ?? (string) $value,
             'category' => self::CATEGORIES[$value] ?? (string) $value,
             'assignee_id' => (string) (fetchOne($this->c, 'SELECT name FROM users WHERE id = $1', [(int) $value])['name'] ?? ''),
-            'due_date' => date('m/d/Y', (int) strtotime((string) $value)),
+            'due_date' => date('d/m/Y', (int) strtotime((string) $value)),
             'note' => mb_substr((string) $value, 0, 200),
             default => (string) $value,
         };

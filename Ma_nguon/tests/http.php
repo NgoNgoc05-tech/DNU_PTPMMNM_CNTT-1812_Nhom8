@@ -189,30 +189,6 @@ try {
     [$st] = $viewer->request('GET', '/profile.php');
     same($st, 200, 'http-profile-page');
 
-    echo "-- Bản 2.2: lời mời và bộ phận hỗ trợ qua HTTP\n";
-    $B = $fx['projects']['B'];
-    [$st] = $designer->request('POST', '/members.php', http_build_query(['csrf' => $designer->csrf, 'project_id' => $B, 'action' => 'add',
-        'email' => $email('viewer'), 'role' => 'COMMENT', 'message' => 'Mời vào B']), $form);
-    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [303, null], 'http-invite-does-not-add-member');
-    $inv = (new ProjectRepository($c))->pendingInvitations($B)[0];
-    [$st] = $reviewer->request('POST', '/invitation.php', http_build_query(['csrf' => $reviewer->csrf, 'invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
-    same([$st, Access::roleFor($c, $fx['users']['V'], $B), count((new ProjectRepository($c))->pendingInvitations($B))], [303, null, 1],
-        'http-other-user-cannot-accept-invite');
-    [$st] = $viewer->request('POST', '/invitation.php', http_build_query(['invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
-    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [403, null], 'http-accept-needs-csrf');
-    [$st, $hd] = $viewer->request('POST', '/invitation.php', http_build_query(['csrf' => $viewer->csrf, 'invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
-    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [303, 'COMMENT'], 'http-invitee-accepts');
-    [$st] = $viewer->request('GET', '/support_admin.php');
-    same($st, 403, 'http-support-desk-forbidden');
-    $staff = new Browser($base);
-    $staff->login($email('hotro'));
-    [$st, , $html] = $staff->request('GET', '/support_admin.php?status=OPEN');
-    same([$st, str_contains($html, '&lt;b&gt;Lỗi&lt;/b&gt; tải ảnh')], [200, true], 'http-support-desk-lists-escaped');
-    $tid = (int) fetchOne($c, "SELECT id FROM support_tickets WHERE subject = '<b>Lỗi</b> tải ảnh' ORDER BY id DESC LIMIT 1")['id'];
-    [$st] = $staff->request('POST', '/support_admin.php', http_build_query(['csrf' => $staff->csrf, 'id' => $tid, 'reply' => 'Đã sửa', 'status' => 'ANSWERED']), $form);
-    [, , $html] = $viewer->request('GET', '/help.php');
-    same([$st, str_contains($html, 'Đã sửa'), str_contains($html, 'Bộ phận hỗ trợ Pinpoint trả lời')], [303, true, true], 'http-support-reply-visible-to-user');
-
     $boundary = 'pinpointboundary';
     $multipart = "--$boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{$designer->csrf}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"screen_id\"\r\n\r\n{$first['screen_id']}\r\n"

@@ -657,7 +657,7 @@ dialog.modal::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blu
   width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; padding: 0; }
 .date-field .date-btn:hover { background: var(--surface-2); color: var(--brand); }
 .date-field .date-btn svg.icon { width: 15px; height: 15px; }
-
+.date-field .date-native { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
 .props .date-field input[type=text] { height: 30px; padding: 3px 32px 3px 8px; font-size: .84rem; border-color: transparent; background-color: transparent; border-radius: 8px; }
 .props .date-field input[type=text]:hover { background-color: var(--surface-2); border-color: var(--line); }
 .props .date-field input[type=text]:focus { background-color: var(--surface); border-color: var(--brand); }
@@ -743,39 +743,3 @@ dialog.modal::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blu
 .link-list li { display: flex; gap: 7px; align-items: flex-start; }
 .link-list a, .link-list span { display: inline; }
 .link-list svg.icon { margin-top: 3px; }
-
-/* ---------- Bản 2.2: lời mời ---------- */
-.invites { margin-bottom: 22px; }
-.invite-list { display: grid; gap: 10px; }
-.invite-card { display: flex; align-items: center; gap: 16px; justify-content: space-between; flex-wrap: wrap; border-color: color-mix(in srgb, var(--brand) 35%, var(--line));
-  background: linear-gradient(90deg, var(--brand-soft), var(--surface) 70%); }
-.invite-main { display: flex; gap: 12px; align-items: flex-start; min-width: 0; flex: 1; }
-.invite-main .quote { margin-top: 6px; background: var(--surface); border-radius: 8px; padding: 5px 9px; font-size: .88rem; }
-.invite-actions { display: flex; gap: 8px; }
-.invite-actions form { margin: 0; }
-.pending-list li { opacity: .85; }
-
-/* ---------- Bản 2.2: bộ phận hỗ trợ ---------- */
-.support-desk { gap: 14px; }
-.ticket-admin { display: grid; gap: 10px; }
-.ticket-admin .grow { flex: 1; min-width: 0; }
-.ticket-message { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0; }
-.ticket-answer { display: grid; gap: 8px; margin: 0; }
-.ticket-answer textarea { min-height: 90px; }
-.ticket-answer select { width: auto; }
-/* Lịch chọn hạn xử lý (tiếng Việt, tuần bắt đầu từ thứ Hai) */
-.cal-pop { position: fixed; z-index: 1000; width: 260px; padding: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line);
-  border-radius: 14px; box-shadow: var(--shadow-lg, 0 12px 32px rgba(15, 23, 42, .18)); font-size: .86rem; }
-.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.cal-title { font-size: .92rem; }
-.cal-nav { border: 0; background: none; width: 30px; height: 30px; border-radius: 8px; font-size: 1.2rem; line-height: 1; color: var(--text-2); cursor: pointer; }
-.cal-nav:hover { background: var(--surface-2); color: var(--brand); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.cal-wd { text-align: center; font-size: .72rem; font-weight: 700; color: var(--text-3); padding: 4px 0; }
-.cal-day { border: 0; background: none; height: 32px; border-radius: 8px; font: inherit; font-variant-numeric: tabular-nums; color: var(--text); cursor: pointer; }
-.cal-day:hover { background: var(--surface-2); }
-.cal-day:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.cal-wd.is-sun, .cal-day.is-sun { color: var(--danger); }
-.cal-day.is-today { box-shadow: inset 0 0 0 1.5px var(--brand); font-weight: 700; }
-.cal-day.is-selected { background: var(--brand); color: #fff; font-weight: 700; }
-.cal-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }

@@ -223,57 +223,9 @@ try {
     $ticket = $support->create($V, 'BUG', 'Không tải được ảnh', 'Ảnh JPEG 3 MB bị từ chối');
     throwsCode(fn () => $support->create($V, 'BUG', '', 'x'), 'TICKET_INVALID', 'v21-ticket-validated');
     $support->answer($ticket, 'Ảnh có thể là WebP đổi đuôi. Hãy xuất lại sang JPEG.');
-    same([$support->listFor($V)[0]['status'], in_array($ticket, array_column($support->listFor($R), 'id'), false)], ['ANSWERED', false], 'v21-ticket-answered-and-private');
+    same([$support->listFor($V)[0]['status'], count($support->listFor($R))], ['ANSWERED', 0], 'v21-ticket-answered-and-private');
     $support->close($R, $ticket);
     same($support->listFor($V)[0]['status'], 'ANSWERED', 'v21-cannot-close-others-ticket');
-
-    echo "-- Bản 2.2: bộ phận hỗ trợ xử lý yêu cầu\n";
-    $S = (int) $fx['support'];
-    same([SupportRepository::isStaff($c, $S), SupportRepository::isStaff($c, $V)], [true, false], 'v22-support-role');
-    $notes = new NotificationRepository($c);
-    $before = $notes->unreadCount($S);
-    $t2 = $support->create($R, 'QUESTION', 'Cách xuất CSV', 'Xuất ở đâu?');
-    $staffNote = $notes->listFor($S, 1)[0];
-    same([$notes->unreadCount($S) - $before, $staffNote['kind'], $staffNote['link']], [1, 'TICKET', '/support_admin.php#t' . $t2], 'v22-new-ticket-notifies-support');
-    same(in_array($t2, array_map('intval', array_column($support->listAll('OPEN'), 'id')), true), true, 'v22-support-sees-all-open');
-    $support->answer($t2, 'Mở dự án → Danh sách góp ý → Xuất CSV.', 'ANSWERED', $S);
-    $row = $support->listFor($R)[0];
-    $userNote = $notes->listFor($R, 1)[0];
-    same([$row['status'], $row['handled_by_name'], $userNote['kind'], $userNote['link']],
-        ['ANSWERED', 'Bộ phận hỗ trợ Pinpoint', 'TICKET_REPLY', '/help.php#tickets'], 'v22-reply-notifies-user-with-handler');
-    $n0 = $notes->unreadCount($R);
-    $support->answer($t2, 'Mở dự án → Danh sách góp ý → Xuất CSV.', 'CLOSED', $S);
-    same($notes->unreadCount($R), $n0, 'v22-status-only-change-no-duplicate-notice');
-    throwsCode(fn () => $support->answer(999999999, 'x'), 'NOT_FOUND', 'v22-answer-missing-ticket');
-
-    echo "-- Bản 2.2: lời mời tham gia dự án phải được chấp nhận\n";
-    $projects = new ProjectRepository($c);
-    $inviteProject = $projects->create('Dự án thử mời ' . $suffix, '', $D);
-    $vEmail = fetchOne($c, 'SELECT email FROM users WHERE id = $1', [$V])['email'];
-    same($projects->invite($inviteProject, $vEmail, 'COMMENT', $D, 'Vào góp ý nhé')['status'], 'INVITED', 'v22-invite-created');
-    same(Access::roleFor($c, $V, $inviteProject), null, 'v22-invitee-not-member-yet');
-    same(count($projects->pendingInvitations($inviteProject)), 1, 'v22-pending-listed-for-manager');
-    $iv = array_values(array_filter($projects->invitationsFor($V), fn ($x) => (int) $x['project_id'] === $inviteProject))[0];
-    same([$iv['role'], $iv['message']], ['COMMENT', 'Vào góp ý nhé'], 'v22-invitee-sees-invitation');
-    same($notes->listFor($V, 1)[0]['kind'], 'INVITE', 'v22-invite-notification');
-    same($projects->invite($inviteProject, $vEmail, 'VIEW', $D)['status'], 'RESENT', 'v22-reinvite-updates-pending');
-    same(count($projects->pendingInvitations($inviteProject)), 1, 'v22-no-duplicate-pending');
-    throwsCode(fn () => $projects->respondInvitation((int) $iv['id'], $R, true), 'INVITATION_NOT_FOUND', 'v22-other-user-cannot-accept');
-    same($projects->respondInvitation((int) $iv['id'], $V, true), $inviteProject, 'v22-accept');
-    same(Access::roleFor($c, $V, $inviteProject), 'VIEW', 'v22-member-after-accept-with-latest-role');
-    same([$notes->listFor($D, 1)[0]['kind'], count($projects->pendingInvitations($inviteProject))], ['INVITE_REPLY', 0], 'v22-inviter-notified');
-    throwsCode(fn () => $projects->respondInvitation((int) $iv['id'], $V, true), 'INVITATION_NOT_FOUND', 'v22-cannot-answer-twice');
-    $rEmail = fetchOne($c, 'SELECT email FROM users WHERE id = $1', [$R])['email'];
-    $projects->invite($inviteProject, $rEmail, 'COMMENT', $D);
-    $ivR = (int) $projects->pendingInvitations($inviteProject)[0]['id'];
-    $projects->respondInvitation($ivR, $R, false);
-    same(Access::roleFor($c, $R, $inviteProject), null, 'v22-decline-not-member');
-    $projects->invite($inviteProject, $rEmail, 'COMMENT', $D);
-    $ivR2 = (int) $projects->pendingInvitations($inviteProject)[0]['id'];
-    $projects->cancelInvitation($inviteProject, $ivR2);
-    throwsCode(fn () => $projects->respondInvitation($ivR2, $R, true), 'INVITATION_NOT_FOUND', 'v22-cancelled-invite-unusable');
-    same($projects->invite($inviteProject, $vEmail, 'ADMIN', $D)['status'], 'ROLE_UPDATED', 'v22-invite-existing-member-updates-role');
-    $projects->delete($inviteProject, $D, 'Dự án thử mời ' . $suffix);
 
     echo "-- Tìm kiếm và xuất danh sách\n";
     $open = $repo->search($A, 'OPEN');

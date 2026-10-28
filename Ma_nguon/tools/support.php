@@ -6,7 +6,6 @@ declare(strict_types=1);
 //   php tools/support.php list                 — liệt kê yêu cầu đang chờ
 //   php tools/support.php reply <id> "nội dung" — trả lời (trạng thái: Đã trả lời)
 //   php tools/support.php close <id>           — đóng yêu cầu
-//   php tools/support.php grant <email>        — cấp quyền bộ phận hỗ trợ cho một tài khoản (revoke <email> để thu hồi)
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
     exit;
@@ -29,10 +28,7 @@ if ($cmd === 'list') {
 } elseif ($cmd === 'close' && isset($argv[2])) {
     $repo->answer((int) $argv[2], (string) (fetchOne($c, 'SELECT reply FROM support_tickets WHERE id = $1', [(int) $argv[2]])['reply'] ?? ''), 'CLOSED');
     echo "Đã đóng yêu cầu #{$argv[2]}.\n";
-} elseif (in_array($cmd, ['grant', 'revoke'], true) && isset($argv[2])) {
-    $r = queryParams($c, 'UPDATE users SET is_support = $2 WHERE email = $1', [strtolower(trim($argv[2])), $cmd === 'grant' ? 't' : 'f']);
-    echo pg_affected_rows($r) === 1 ? ($cmd === 'grant' ? 'Đã cấp' : 'Đã thu hồi') . " quyền bộ phận hỗ trợ cho {$argv[2]}.\n" : "Không tìm thấy tài khoản {$argv[2]}.\n";
 } else {
-    fwrite(STDERR, "Cách dùng: php tools/support.php list | reply <id> \"nội dung\" | close <id> | grant <email> | revoke <email>\n");
+    fwrite(STDERR, "Cách dùng: php tools/support.php list | reply <id> \"nội dung\" | close <id>\n");
     exit(2);
 }

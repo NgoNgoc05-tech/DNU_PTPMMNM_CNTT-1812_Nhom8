@@ -73,8 +73,8 @@ bash lab.sh test
 |---|---|---|
 | Đơn vị (không cần CSDL) | tests/run.php | `TESTS=56 FAILED=0` |
 | JavaScript toạ độ | tests/js/coords.test.mjs | `# pass 6`, `# fail 0` |
-| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0/2.1/2.2 | tests/integration.php | `TESTS=116 FAILED=0` |
-| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0/2.1, lời mời, bộ phận hỗ trợ | tests/http.php | `TESTS=43 FAILED=0` |
+| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0/2.1 | tests/integration.php | `TESTS=95 FAILED=0` |
+| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0/2.1 | tests/http.php | `TESTS=36 FAILED=0` |
 | Tổng | | `KET_QUA=TAT_CA_DAT` |
 
 Bộ tích hợp và bộ HTTP tự nạp một bộ dữ liệu riêng (email có hậu tố ngẫu nhiên), rồi tự xoá khi chạy xong. Dữ liệu demo không bị ảnh hưởng.
@@ -86,7 +86,7 @@ Kiểm thử trên trình duyệt thật (tuỳ chọn, cũng chạy tự độn
 npm install
 npx playwright install chromium
 bash lab.sh run          # terminal 1
-bash lab.sh e2e          # terminal 2 → TESTS=47 FAILED=0
+bash lab.sh e2e          # terminal 2 → TESTS=31 FAILED=0
 ```
 
 Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể `bash lab.sh reset` để đưa dữ liệu demo về ban đầu.
@@ -96,9 +96,7 @@ Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể
 ### Tình huống 1 — Tạo dự án → tải ảnh → đánh dấu nút cần sửa → nhận xét → trả lời
 
 1. Đăng nhập **designer** (ở trang đăng nhập bấm thẻ tài khoản mẫu để điền sẵn). Bấm **+ Dự án mới**, đặt tên “Demo vấn đáp”.
-2. Trong dự án, ở khung *Thành viên*, gửi lời mời `reviewer@pinpoint.test` với quyền **Góp ý** và `viewer@pinpoint.test` với quyền **Chỉ xem**.
-   Hai lời mời nằm ở mục *Đang chờ xác nhận*. Đăng nhập **reviewer** và **viewer**: đầu trang *Dự án* có thẻ lời mời → bấm **Chấp nhận**
-   (từ bản 2.2, người được mời phải chấp nhận thì mới vào dự án; Quản lý có thể huỷ lời mời đang chờ).
+2. Trong dự án, ở khung *Thành viên*, mời `reviewer@pinpoint.test` với quyền **Góp ý** và `viewer@pinpoint.test` với quyền **Chỉ xem**.
 3. Bấm **Thêm màn hình**, đặt tên “Trang chủ”, kéo thả ảnh `database/fixtures/a-trang-chu-v1.png` vào khung rồi bấm *Tải lên*.
 4. Đăng nhập **reviewer** ở cửa sổ ẩn danh và mở màn hình “Trang chủ”.
    - Rê chuột trên ảnh: góc trên phải hiện toạ độ theo **px ảnh gốc**. Chọn **Điểm** (phím `C`) và bấm đúng nút “Đặt ngay” → khoảng (750; 150).
@@ -122,21 +120,16 @@ Bài e2e tạo thêm góp ý và một phiên bản ảnh. Chạy xong có thể
    trạng thái, người góp ý, ưu tiên, nhãn, người phụ trách, quá hạn. Bấm **Xuất CSV** (22 cột: nội dung, vị trí, người viết, trạng thái,
    phiên bản, ưu tiên, nhãn, phụ trách, hạn, ghi chú, phiên bản kiểm tra sau sửa…) hoặc **In / PDF**.
 
-### Tình huống 3 (bản 2.1, 2.2) — Thông báo, xoá ảnh tải nhầm, hạn xử lý, hỗ trợ
+### Tình huống 3 (bản 2.1) — Thông báo, xoá ảnh tải nhầm, hỗ trợ
 
 1. **reviewer** mở một góp ý, trả lời có `@Nguyễn Thu Trang`. Ở cửa sổ **designer**, biểu tượng 🔔 hiện số đỏ; bấm vào để xem
    “Lê Minh Đức nhắc tới bạn”, bấm thông báo để mở đúng góp ý. Giao việc cho ai, người đó cũng nhận thông báo.
 2. **designer** tải nhầm một ảnh làm phiên bản mới → bấm ⚙ trên thanh công cụ → **Xoá phiên bản đang xem** → xác nhận. Phiên bản và
    góp ý trên nó bị xoá, các phiên bản khác giữ nguyên.
-3. Ở ô **Hạn xử lý** gõ `11/05/2026` theo dạng **tháng/ngày/năm** (= ngày 5 tháng 11) hoặc bấm biểu tượng lịch để mở lịch tiếng Việt
-   (Tháng 11, 2026 · T2…CN · *Hôm nay* · *Xoá hạn*; dùng phím mũi tên để chọn ngày).
-4. Bấm **Hỏi trợ lý** ở góc phải dưới, hỏi “làm sao so sánh hai phiên bản?”. Vào **Hỗ trợ** để xem câu hỏi thường gặp và gửi yêu cầu.
-5. **Ai xử lý yêu cầu hỗ trợ?** (bản 2.2) Đăng nhập tài khoản **bộ phận hỗ trợ** `hotro@pinpoint.test` / `Pinpoint@123`: chuông 🔔 báo
-   có yêu cầu mới, menu có thêm **Xử lý yêu cầu** (`/support_admin.php`). Viết câu trả lời, chọn trạng thái rồi bấm *Lưu và gửi trả lời*.
-   Người gửi nhận thông báo và thấy câu trả lời ở mục *Yêu cầu của tôi* (trạng thái *Đang chờ* → *Đã trả lời*).
-   Cấp quyền hỗ trợ cho tài khoản khác: `php tools/support.php grant email@...` (thu hồi: `revoke`). Vẫn trả lời được bằng dòng lệnh:
-   `php tools/support.php list`, `php tools/support.php reply <số> "nội dung"`.
-6. Bấm ảnh đại diện → **Hồ sơ của tôi** để đổi tên, chức danh, mật khẩu.
+3. Ở ô **Hạn xử lý** gõ `05/11/2026` (ngày/tháng/năm) hoặc bấm biểu tượng lịch.
+4. Bấm **Hỏi trợ lý** ở góc phải dưới, hỏi “làm sao so sánh hai phiên bản?”. Vào **Hỗ trợ** để xem câu hỏi thường gặp và gửi yêu cầu;
+   người hỗ trợ trả lời bằng `php tools/support.php list` rồi `php tools/support.php reply <số> "nội dung"`.
+5. Bấm ảnh đại diện → **Hồ sơ của tôi** để đổi tên, chức danh, mật khẩu.
 
 **Trợ lý ảo dùng AI (không bắt buộc):** mặc định trợ lý trả lời bằng cơ sở tri thức chạy trên máy (không cần mạng). Muốn dùng mô hình
 AI, đặt biến môi trường `PINPOINT_AI_KEY` (khoá API Anthropic) trước khi `bash lab.sh run`, ví dụ `PINPOINT_AI_KEY=... bash lab.sh run`;

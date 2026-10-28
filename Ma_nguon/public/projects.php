@@ -19,7 +19,6 @@ if (isPost()) {
 }
 $projects = $repo->listForUser($user['id']);
 $mine = (new AnnotationRepository($c))->assignedTo($user['id'], 5);
-$invites = $repo->invitationsFor($user['id']);
 $totalOpen = array_sum(array_map(fn ($p) => (int) $p['open_items'], $projects));
 $totalAll = array_sum(array_map(fn ($p) => (int) $p['total_items'], $projects));
 $hour = (int) date('G');
@@ -32,37 +31,11 @@ require __DIR__ . '/../templates/header.php';
 <div class="page-head">
 <div>
 <h1><?= e($greet) ?>, <?= e(end($firstName)) ?> 👋</h1>
-<p>Bạn tham gia <?= count($projects) ?> dự án · <?= $totalOpen ?> góp ý đang chờ xử lý trên tổng <?= $totalAll ?><?= $invites !== [] ? ' · <a href="#invites">' . count($invites) . ' lời mời đang chờ</a>' : '' ?>.</p>
+<p>Bạn tham gia <?= count($projects) ?> dự án · <?= $totalOpen ?> góp ý đang chờ xử lý trên tổng <?= $totalAll ?>.</p>
 </div>
 <div class="actions"><button type="button" class="btn" data-open="dlg-new-project"><?= icon('plus') ?>Dự án mới</button></div>
 </div>
 <?php if ($error !== ''): ?><div class="flash error" role="alert"><?= icon('alert') ?><span><?= e($error) ?></span></div><?php endif; ?>
-
-<?php if ($invites !== []): ?>
-<section class="invites" id="invites">
-<div class="section-title"><h2><?= icon('inbox') ?>Lời mời tham gia dự án <span class="count"><?= count($invites) ?></span></h2></div>
-<div class="invite-list">
-<?php foreach ($invites as $iv): ?>
-<div class="card invite-card" data-invitation="<?= (int) $iv['id'] ?>">
-<div class="invite-main">
-<?= avatar($iv['invited_by'] ?? '?', (int) ($iv['invited_by_id'] ?? 0), 'lg') ?>
-<div>
-<div><strong><?= e($iv['invited_by'] ?? 'Ai đó') ?></strong> mời bạn tham gia <strong><?= e($iv['project_name']) ?></strong> với quyền <span class="badge badge-role"><?= e(Access::LABELS[$iv['role']]) ?></span></div>
-<div class="hint"><?= e($iv['description'] !== '' ? $iv['description'] : 'Chưa có mô tả') ?> · <?= (int) $iv['screens'] ?> màn hình · <?= (int) $iv['members'] ?> thành viên · <?= e(ago($iv['created_at'])) ?></div>
-<?php if ($iv['message'] !== ''): ?><div class="quote">“<?= e($iv['message']) ?>”</div><?php endif; ?>
-</div>
-</div>
-<div class="invite-actions">
-<form method="post" action="/invitation.php"><?= csrfField() ?><input type="hidden" name="invitation_id" value="<?= (int) $iv['id'] ?>"><input type="hidden" name="answer" value="decline">
-<button class="btn btn-ghost" type="submit">Từ chối</button></form>
-<form method="post" action="/invitation.php"><?= csrfField() ?><input type="hidden" name="invitation_id" value="<?= (int) $iv['id'] ?>"><input type="hidden" name="answer" value="accept">
-<button class="btn" type="submit"><?= icon('check') ?>Chấp nhận</button></form>
-</div>
-</div>
-<?php endforeach; ?>
-</div>
-</section>
-<?php endif; ?>
 
 <div class="layout-side">
 <section>
@@ -71,7 +44,7 @@ require __DIR__ . '/../templates/header.php';
 <div class="card empty-state">
 <div class="empty-art"><?= icon('folder') ?></div>
 <h3>Bạn chưa thuộc dự án nào</h3>
-<p>Tạo dự án mới hoặc nhờ quản lý dự án mời bạn bằng email đã đăng ký, rồi chấp nhận lời mời ở đầu trang này.</p>
+<p>Tạo dự án mới hoặc nhờ quản lý dự án mời bạn bằng email đã đăng ký.</p>
 <button type="button" class="btn" data-open="dlg-new-project"><?= icon('plus') ?>Tạo dự án đầu tiên</button>
 </div>
 <?php else: ?>

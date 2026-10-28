@@ -98,6 +98,7 @@
     if (s < 604800) { return Math.floor(s / 86400) + ' ngày trước'; }
     return fmt(ts).slice(0, 5);
   }
+  function dmy(date) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
   function num(v) { return (Math.round(v * 100) / 100).toString(); }
   function position(a) {
     return a.shape === 'POINT'
@@ -125,7 +126,7 @@
   function cat(c) { return el('span', { class: 'cat cat-' + c, text: CATEGORY[c] || c }); }
   function due(a) {
     if (!a.due_date) { return null; }
-    var s = el('span', { class: 'due' + (a.overdue ? ' is-overdue' : '') }, [icon('calendar'), mdy(a.due_date).slice(0, 5) + (a.overdue ? ' · quá hạn' : '')]);
+    var s = el('span', { class: 'due' + (a.overdue ? ' is-overdue' : '') }, [icon('calendar'), dmy(a.due_date).slice(0, 5) + (a.overdue ? ' · quá hạn' : '')]);
     return s;
   }
   function options(select, map, current) {
@@ -134,115 +135,34 @@
   }
 
   /**
-   * Ô hạn xử lý theo dạng tháng/ngày/năm (mm/dd/yyyy) — không phụ thuộc ngôn ngữ trình duyệt.
-   * Gõ trực tiếp hoặc bấm biểu tượng lịch để mở lịch tiếng Việt của ứng dụng (không dùng lịch gốc tiếng Anh).
-   * getIso() trả về yyyy-mm-dd cho máy chủ ('' = không đặt).
+   * Ô ngày hiển thị theo kiểu Việt Nam ngày/tháng/năm (dd/mm/yyyy) — không phụ thuộc ngôn ngữ trình duyệt.
+   * Gõ trực tiếp hoặc bấm biểu tượng lịch để chọn. getIso() trả về yyyy-mm-dd cho máy chủ ('' = không đặt).
    */
-  var WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  var openCal = null;
-  function closeCalendar() { if (openCal) { openCal.close(); } }
-  document.addEventListener('mousedown', function (e) {
-    if (openCal && !openCal.pop.contains(e.target) && !openCal.owner.contains(e.target)) { closeCalendar(); }
-  });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openCal) { var o = openCal.owner; closeCalendar(); o.input.focus(); } }, true);
-  window.addEventListener('resize', closeCalendar);
-  document.addEventListener('scroll', function (e) { if (openCal && !openCal.pop.contains(e.target)) { closeCalendar(); } }, true);
-
-  function isoOf(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
-  function todayIso() { var t = new Date(); return isoOf(t.getFullYear(), t.getMonth(), t.getDate()); }
-
-  function calendar(owner, selectedIso, onPick) {
-    var pop = el('div', { class: 'cal-pop', role: 'dialog', 'aria-label': 'Chọn hạn xử lý' });
-    var base = /^(\d{4})-(\d{2})/.exec(selectedIso || '') || /^(\d{4})-(\d{2})/.exec(todayIso());
-    var view = { y: +base[1], m: +base[2] - 1 };
-    var title = el('strong', { class: 'cal-title', 'aria-live': 'polite' });
-    var prev = el('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Tháng trước', text: '‹' });
-    var next = el('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Tháng sau', text: '›' });
-    var grid = el('div', { class: 'cal-grid', role: 'grid' });
-    var todayBtn = el('button', { type: 'button', class: 'btn btn-xs btn-subtle', text: 'Hôm nay' });
-    var clearBtn = el('button', { type: 'button', class: 'btn btn-xs btn-subtle', text: 'Xoá hạn' });
-    pop.appendChild(el('div', { class: 'cal-head' }, [prev, title, next]));
-    pop.appendChild(grid);
-    pop.appendChild(el('div', { class: 'cal-foot' }, [clearBtn, todayBtn]));
-    function render(focusIso) {
-      title.textContent = 'Tháng ' + (view.m + 1) + ', ' + view.y;
-      grid.textContent = '';
-      WEEKDAYS.forEach(function (w) { grid.appendChild(el('span', { class: 'cal-wd' + (w === 'CN' ? ' is-sun' : ''), text: w })); });
-      var first = new Date(view.y, view.m, 1);
-      var lead = (first.getDay() + 6) % 7; // thứ Hai là cột đầu
-      var days = new Date(view.y, view.m + 1, 0).getDate();
-      for (var i = 0; i < lead; i++) { grid.appendChild(el('span', { class: 'cal-empty' })); }
-      var today = todayIso();
-      for (var d = 1; d <= days; d++) {
-        var iso = isoOf(view.y, view.m, d);
-        var b = el('button', { type: 'button', class: 'cal-day' + (iso === today ? ' is-today' : '') + (iso === selectedIso ? ' is-selected' : '')
-          + ((lead + d - 1) % 7 === 6 ? ' is-sun' : ''), 'data-iso': iso, text: String(d),
-          'aria-label': 'Ngày ' + d + ' tháng ' + (view.m + 1) + ' năm ' + view.y, 'aria-pressed': iso === selectedIso ? 'true' : 'false' });
-        grid.appendChild(b);
-      }
-      var f = focusIso && grid.querySelector('[data-iso="' + focusIso + '"]');
-      if (f) { f.focus(); }
-    }
-    function shift(n) { view.m += n; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } render(); }
-    prev.addEventListener('click', function () { shift(-1); });
-    next.addEventListener('click', function () { shift(1); });
-    grid.addEventListener('click', function (e) { var b = e.target.closest('.cal-day'); if (b) { onPick(b.getAttribute('data-iso')); api.close(); owner.input.focus(); } });
-    grid.addEventListener('keydown', function (e) {
-      var b = e.target.closest('.cal-day'); if (!b) { return; }
-      var step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
-      if (!step) { return; }
-      e.preventDefault();
-      var p = b.getAttribute('data-iso').split('-');
-      var dt = new Date(+p[0], +p[1] - 1, +p[2] + step);
-      view.y = dt.getFullYear(); view.m = dt.getMonth();
-      render(isoOf(view.y, view.m, dt.getDate()));
-    });
-    todayBtn.addEventListener('click', function () { onPick(todayIso()); api.close(); owner.input.focus(); });
-    clearBtn.addEventListener('click', function () { onPick(''); api.close(); owner.input.focus(); });
-    var api = {
-      pop: pop, owner: owner,
-      close: function () { if (pop.parentNode) { pop.parentNode.removeChild(pop); } if (openCal === api) { openCal = null; } owner.btn.setAttribute('aria-expanded', 'false'); }
-    };
-    render();
-    document.body.appendChild(pop);
-    // Đặt lịch ngay dưới ô (hoặc phía trên nếu thiếu chỗ); dùng position: fixed để không bị khung cuộn cắt mất.
-    var r = owner.getBoundingClientRect();
-    var h = pop.offsetHeight, w = pop.offsetWidth;
-    var top = r.bottom + 6 + h > window.innerHeight ? Math.max(8, r.top - 6 - h) : r.bottom + 6;
-    pop.style.top = top + 'px';
-    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
-    owner.btn.setAttribute('aria-expanded', 'true');
-    var sel = grid.querySelector('.is-selected') || grid.querySelector('.is-today') || grid.querySelector('.cal-day');
-    if (sel) { sel.focus(); }
-    openCal = api;
-    return api;
-  }
-
-  function mdy(date) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || ''); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; }
-
   function dateField(iso, label, onChange) {
     var wrap = el('span', { class: 'date-field' });
-    var text = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'tháng/ngày/năm', maxlength: '10', 'aria-label': label + ' (tháng/ngày/năm)',
-      autocomplete: 'off', value: mdy(iso) });
-    var btn = el('button', { type: 'button', class: 'date-btn', title: 'Chọn ngày trên lịch', 'aria-label': 'Chọn ngày trên lịch', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' }, [icon('calendar')]);
+    var text = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'ngày/tháng/năm', maxlength: '10', 'aria-label': label,
+      autocomplete: 'off', value: dmy(iso) });
+    var picker = el('input', { type: 'date', tabindex: '-1', 'aria-hidden': 'true', class: 'date-native', value: iso || '' });
+    var btn = el('button', { type: 'button', class: 'date-btn', title: 'Chọn ngày trên lịch', 'aria-label': 'Chọn ngày trên lịch' }, [icon('calendar')]);
     var current = iso || '';
     function parse(v) {
       v = v.trim();
       if (v === '') { return ''; }
       var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(v);
       if (!m) { return null; }
-      var mo = +m[1], d = +m[2], y = +m[3];
+      var d = +m[1], mo = +m[2], y = +m[3];
       var dt = new Date(Date.UTC(y, mo - 1, d));
       if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) { return null; }
-      return isoOf(y, mo - 1, d);
+      return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     }
     function commit(newIso) {
       text.classList.remove('is-invalid');
-      text.value = mdy(newIso);
+      text.value = dmy(newIso);
+      picker.value = newIso;
       if (newIso !== current) { current = newIso; if (onChange) { onChange(newIso); } }
     }
     text.addEventListener('input', function () {
-      // tự thêm dấu "/" khi gõ số: 1025 -> 10/25
+      // tự thêm dấu "/" khi gõ số: 2110 -> 21/10
       var digits = text.value.replace(/[^0-9]/g, '').slice(0, 8);
       if (/^[0-9\/]*$/.test(text.value)) {
         text.value = digits.length > 4 ? digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4)
@@ -251,25 +171,21 @@
     });
     text.addEventListener('change', function () {
       var v = parse(text.value);
-      if (v === null) { text.classList.add('is-invalid'); toast('Ngày không hợp lệ. Nhập theo dạng tháng/ngày/năm, ví dụ 10/25/2026 (25 tháng 10).', true); return; }
+      if (v === null) { text.classList.add('is-invalid'); toast('Ngày không hợp lệ. Nhập theo dạng ngày/tháng/năm, ví dụ 25/10/2026.', true); return; }
       commit(v);
     });
-    text.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); text.dispatchEvent(new Event('change')); }
-      if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); btn.click(); }
-    });
+    text.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); text.dispatchEvent(new Event('change')); } });
+    picker.addEventListener('change', function () { commit(picker.value); });
     btn.addEventListener('click', function () {
-      var mine = openCal && openCal.owner === wrap;
-      closeCalendar();
-      if (mine) { return; }
-      var v = parse(text.value);
-      calendar(wrap, v === null ? current : v, commit);
+      if (picker.showPicker) { try { picker.showPicker(); return; } catch (e) { /* trình duyệt cũ */ } }
+      picker.focus();
+      picker.click();
     });
     wrap.appendChild(text);
     wrap.appendChild(btn);
+    wrap.appendChild(picker);
     wrap.getIso = function () { var v = parse(text.value); return v === null ? '' : v; };
     wrap.input = text;
-    wrap.btn = btn;
     return wrap;
   }
 

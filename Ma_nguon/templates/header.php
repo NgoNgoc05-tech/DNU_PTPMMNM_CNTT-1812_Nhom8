@@ -5,23 +5,7 @@ $active = $active ?? '';
 $flashMsg = flash();
 $myCount = 0;
 $unreadCount = 0;
-$inviteCount = 0;
-$isSupport = !empty($user) && ($user['is_support'] ?? 'f') === 't';
-$ticketCount = 0;
-if ($isSupport) {
-    try {
-        $ticketCount = (int) (fetchOne(db(), "SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'OPEN'")['n'] ?? 0);
-    } catch (Throwable $e) {
-        $ticketCount = 0;
-    }
-}
 if (!empty($user)) {
-    try {
-        $inviteCount = (int) (fetchOne(db(), "SELECT COUNT(*) AS n FROM project_invitations WHERE user_id = $1 AND status = 'PENDING'",
-            [(int) $user['id']])['n'] ?? 0);
-    } catch (Throwable $e) {
-        $inviteCount = 0;
-    }
     try {
         $unreadCount = (new NotificationRepository(db()))->unreadCount((int) $user['id']);
     } catch (Throwable $e) {
@@ -51,13 +35,12 @@ if (!empty($user)) {
 <a class="skip-link" href="#main">Đến nội dung chính</a>
 <header class="site-header">
 <div class="header-inner">
-<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.2</small></a>
+<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.0</small></a>
 <?php if (!empty($user)): ?>
 <nav class="main-nav" aria-label="Điều hướng chính">
-<a href="/projects.php"<?= $active === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder') ?>Dự án<?php if ($inviteCount > 0): ?> <span class="nav-count" title="Lời mời đang chờ"><?= $inviteCount ?></span><?php endif; ?></a>
+<a href="/projects.php"<?= $active === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder') ?>Dự án</a>
 <a href="/inbox.php"<?= $active === 'inbox' ? ' aria-current="page"' : '' ?>><?= icon('inbox') ?>Việc của tôi<?php if ($myCount > 0): ?> <span class="nav-count"><?= $myCount ?></span><?php endif; ?></a>
 <a href="/help.php"<?= $active === 'help' ? ' aria-current="page"' : '' ?>><?= icon('chat') ?>Hỗ trợ</a>
-<?php if ($isSupport): ?><a href="/support_admin.php"<?= $active === 'support' ? ' aria-current="page"' : '' ?>><?= icon('inbox') ?>Xử lý yêu cầu<?php if ($ticketCount > 0): ?> <span class="nav-count" title="Yêu cầu đang chờ"><?= $ticketCount ?></span><?php endif; ?></a><?php endif; ?>
 </nav>
 <div class="user-box">
 <details class="dropdown notif-menu" id="notif-menu" data-csrf="<?= e(csrfToken()) ?>">

@@ -17,8 +17,8 @@ final class Assistant
     public const KB = [
         ['Tạo dự án', ['tao du an', 'du an moi', 'lap du an', 'them du an', 'new project'],
             "Vào trang Dự án, bấm nút “+ Dự án mới”, nhập tên và mô tả rồi bấm Tạo dự án. Người tạo tự động có quyền Quản lý."],
-        ['Mời thành viên và cấp quyền', ['moi', 'thanh vien', 'cap quyen', 'phan quyen', 'quyen', 'role', 'chi xem', 'quan ly', 'invite', 'loi moi', 'chap nhan', 'xac nhan'],
-            "Mở dự án → khung Thành viên → nhập email đã đăng ký tài khoản, chọn quyền (có thể kèm lời nhắn) rồi bấm Gửi lời mời. Người được mời nhận thông báo và phải bấm Chấp nhận ở trang Dự án thì mới vào dự án; trước đó lời mời nằm ở mục “Đang chờ xác nhận” và Quản lý có thể huỷ.\n• Chỉ xem: xem ảnh, góp ý, xuất danh sách.\n• Góp ý: thêm tạo điểm/vùng, trả lời, ghi chú, đánh dấu đã xử lý.\n• Quản lý: thêm tải ảnh, xoá ảnh, quản lý thành viên.\nĐổi quyền bằng ô chọn cạnh tên thành viên; bấm × để xoá khỏi dự án."],
+        ['Mời thành viên và cấp quyền', ['moi', 'thanh vien', 'cap quyen', 'phan quyen', 'quyen', 'role', 'chi xem', 'quan ly', 'invite'],
+            "Mở dự án → khung Thành viên → nhập email đã đăng ký tài khoản, chọn quyền rồi bấm Mời.\n• Chỉ xem: xem ảnh, góp ý, xuất danh sách.\n• Góp ý: thêm tạo điểm/vùng, trả lời, ghi chú, đánh dấu đã xử lý.\n• Quản lý: thêm tải ảnh, xoá ảnh, quản lý thành viên.\nĐổi quyền bằng ô chọn cạnh tên thành viên; bấm × để xoá khỏi dự án."],
         ['Tải ảnh thiết kế', ['tai anh', 'upload', 'them man hinh', 'man hinh moi', 'png', 'jpeg', 'jpg', 'dinh dang', 'dung luong'],
             "Trong dự án bấm “Thêm màn hình”, đặt tên (ví dụ Trang chủ) và kéo thả ảnh vào khung. Chỉ nhận PNG hoặc JPEG, tối đa 5 MB, mỗi chiều 16–8000 px. Ứng dụng kiểm tra nội dung tệp chứ không chỉ phần đuôi."],
         ['Đặt điểm góp ý', ['dat diem', 'diem', 'ghim', 'pin', 'danh dau', 'tao gop y', 'gop y moi', 'nhan xet'],
@@ -42,7 +42,7 @@ final class Assistant
         ['Ghi chú xử lý', ['ghi chu', 'note', 'cach sua', 'thong so'],
             "Mỗi góp ý có khối Ghi chú xử lý để ghi cách sửa, thông số, liên kết tài liệu. Bấm “Thêm ghi chú” / “Sửa ghi chú”. Nếu người khác vừa sửa cùng lúc, ứng dụng báo xung đột và vẫn giữ chữ bạn đã gõ."],
         ['Ưu tiên, nhãn, người phụ trách, hạn', ['uu tien', 'nhan', 'phu trach', 'giao viec', 'han', 'deadline', 'qua han', 'ngay'],
-            "Trong khối Thuộc tính của góp ý: chọn Ưu tiên (Thấp → Khẩn cấp), Nhãn (Bố cục, Màu sắc…), Người phụ trách và Hạn xử lý (định dạng tháng/ngày/năm, ví dụ 10/25/2026 là ngày 25 tháng 10; bấm biểu tượng lịch để chọn trên lịch tiếng Việt). Góp ý chưa xử lý mà quá hạn sẽ hiện nhãn đỏ “Quá hạn”."],
+            "Trong khối Thuộc tính của góp ý: chọn Ưu tiên (Thấp → Khẩn cấp), Nhãn (Bố cục, Màu sắc…), Người phụ trách và Hạn xử lý (định dạng ngày/tháng/năm, bấm biểu tượng lịch để chọn). Góp ý chưa xử lý mà quá hạn sẽ hiện nhãn đỏ “Quá hạn”."],
         ['Lọc và tìm góp ý', ['loc', 'tim', 'search', 'chua xu ly', 'filter', 'sap xep'],
             "Trong trình xem: ô tìm kiếm (phím /), các nút Tất cả / Chưa xử lý / Đã xử lý và bộ lọc người góp ý, ưu tiên, nhãn, “Chỉ góp ý giao cho tôi”. Tìm trong cả dự án: trang dự án → “Góp ý chưa xử lý”, lọc thêm theo người phụ trách, quá hạn, màn hình."],
         ['Xuất danh sách', ['xuat', 'csv', 'excel', 'export', 'in', 'pdf', 'bao cao'],
@@ -61,8 +61,8 @@ final class Assistant
             "Trong Ubuntu/WSL: cd Ma_nguon → bash lab.sh db-config → bash lab.sh check → bash lab.sh setup → bash lab.sh run, rồi mở http://127.0.0.1:8115. Lỗi kết nối CSDL: bật dịch vụ bằng “sudo service postgresql start” và chạy lại db-config. Chi tiết trong HUONG_DAN.md."],
         ['Tài khoản dữ liệu mẫu', ['tai khoan mau', 'demo', 'dang nhap', 'designer', 'reviewer', 'viewer'],
             "Tài khoản mẫu: designer@pinpoint.test (Quản lý), reviewer@pinpoint.test (Góp ý), viewer@pinpoint.test (Chỉ xem dự án A). Mật khẩu chung Pinpoint@123."],
-        ['Liên hệ hỗ trợ', ['ho tro', 'lien he', 'support', 'gap nguoi', 'bao loi', 'loi', 'ai xu ly', 'dang cho', 'tra loi yeu cau'],
-            "Mở trang Hỗ trợ (menu trên cùng) → “Gửi yêu cầu hỗ trợ”, chọn loại (Hỏi cách dùng, Báo lỗi, Góp ý tính năng, Tài khoản), mô tả rõ và gửi. Yêu cầu được chuyển tới Bộ phận hỗ trợ Pinpoint: nhân viên hỗ trợ nhận thông báo, trả lời trên trang “Xử lý yêu cầu”. Khi có câu trả lời bạn nhận thông báo 🔔 và đọc ở mục “Yêu cầu của tôi” (trạng thái chuyển từ Đang chờ sang Đã trả lời)."],
+        ['Liên hệ hỗ trợ', ['ho tro', 'lien he', 'support', 'gap nguoi', 'bao loi', 'loi'],
+            "Mở trang Hỗ trợ (menu trên cùng) → “Gửi yêu cầu hỗ trợ”, chọn loại (Hỏi cách dùng, Báo lỗi, Góp ý tính năng, Tài khoản), mô tả rõ và gửi. Bạn theo dõi trạng thái ở mục “Yêu cầu của tôi”."],
     ];
 
     /** Bỏ dấu tiếng Việt và viết thường để so khớp. */

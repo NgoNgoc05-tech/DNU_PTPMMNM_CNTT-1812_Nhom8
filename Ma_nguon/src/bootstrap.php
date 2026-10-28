@@ -58,7 +58,6 @@ function errorMessage(string $code): string
         'PASSWORD_MISMATCH' => 'Hai mật khẩu mới không khớp.',
         'TICKET_INVALID' => 'Hãy nhập tiêu đề (≤ 150 ký tự) và nội dung (≤ 4000 ký tự).',
         'CHAT_INVALID' => 'Câu hỏi phải từ 1 đến 500 ký tự.',
-        'INVITATION_NOT_FOUND' => 'Lời mời không còn hiệu lực (đã được trả lời hoặc đã bị huỷ).',
     ][$code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
