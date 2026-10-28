@@ -27,8 +27,10 @@ Người tạo dự án luôn giữ quyền ADMIN. Quyền được kiểm tra �
 | StatusHistory | `status_history` | from → to, người đổi, `checked_version_id` = phiên bản dùng để kiểm tra, ghi chú |
 | (thuộc tính, bản 2.0) | cột mới của `annotations` | `priority ∈ {LOW, MEDIUM, HIGH, URGENT}`, `category ∈ {LAYOUT, COLOR, TYPO, CONTENT, UX, A11Y, OTHER}`, `assignee_id` → users (phải là thành viên dự án), `due_date`, **`note`** (ghi chú xử lý ≤ 4000 ký tự) + `note_updated_by/at` |
 | Reaction (bản 2.0) | `comment_reactions` | cảm xúc trên nhận xét/trả lời; khoá chính (comment_id, user_id, kind), `kind ∈ {LIKE, HEART, PARTY, EYES}` |
-| Notification (bản 2.1) | `notifications` | người nhận, người thực hiện, `kind ∈ {MENTION, ASSIGNED, REPLY, STATUS}`, góp ý liên quan, trích nội dung, `read_at` |
-| SupportTicket (bản 2.1) | `support_tickets` | yêu cầu hỗ trợ: loại, tiêu đề, nội dung, `status ∈ {OPEN, ANSWERED, CLOSED}`, trả lời |
+| Notification (bản 2.1, 2.2) | `notifications` | người nhận, người thực hiện, `kind ∈ {MENTION, ASSIGNED, REPLY, STATUS, INVITE, INVITE_REPLY, TICKET, TICKET_REPLY}`, góp ý / dự án / yêu cầu liên quan, trích nội dung, `read_at` |
+| SupportTicket (bản 2.1, 2.2) | `support_tickets` | yêu cầu hỗ trợ: loại, tiêu đề, nội dung, `status ∈ {OPEN, ANSWERED, CLOSED}`, trả lời, `handled_by` (nhân viên hỗ trợ trả lời) |
+| ProjectInvitation (bản 2.2) | `project_invitations` | lời mời: dự án, người được mời, quyền, người mời, lời nhắn, `status ∈ {PENDING, ACCEPTED, DECLINED, CANCELLED}`; tối đa một lời mời PENDING cho mỗi (dự án, người) |
+| (thuộc tính) | `users.is_support` | tài khoản thuộc bộ phận hỗ trợ: thấy và trả lời mọi yêu cầu hỗ trợ, không cần thuộc dự án nào |
 | ActivityEvent (bản 2.0) | `annotation_events` | nhật ký mọi thay đổi: `kind ∈ {CREATED, REPLIED, EDITED, STATUS, PRIORITY, CATEGORY, ASSIGNEE, DUE, NOTE}`, giá trị cũ/mới, chi tiết, người làm, thời điểm |
 
 Quan hệ 1–1 theo nghiệp vụ: mỗi Annotation có đúng một nhận xét gốc. Mỗi Screen có một phiên bản mới nhất, là phiên bản có `version_no` lớn nhất.
@@ -130,7 +132,9 @@ flowchart LR
 | `/help.php` (GET/POST) | đăng nhập | Hỗ trợ khách hàng: trợ lý ảo, câu hỏi thường gặp, gửi/đóng yêu cầu của mình |
 | `/delete.php` (POST) | ADMIN (dự án: chỉ người tạo + gõ lại tên) | Xoá phiên bản ảnh tải nhầm, xoá màn hình, xoá dự án |
 | `/inbox.php` | đăng nhập | Việc của tôi: góp ý chưa xử lý được giao cho tôi, nhóm theo quá hạn / sắp đến hạn |
-| `/members.php` (POST) | ADMIN | Thêm / đổi quyền / xoá thành viên |
+| `/members.php` (POST) | ADMIN | Gửi lời mời (người nhận phải chấp nhận) / huỷ lời mời / đổi quyền / xoá thành viên |
+| `/invitation.php` (POST) | người được mời | Chấp nhận (trở thành thành viên với quyền ghi trong lời mời) hoặc từ chối lời mời |
+| `/support_admin.php` (GET/POST) | `users.is_support` | Bộ phận hỗ trợ: xem mọi yêu cầu, lọc theo trạng thái, trả lời, đổi trạng thái |
 | `/screen_new.php`, `/version_new.php` (POST) | ADMIN | Tạo màn hình kèm v1; tải phiên bản mới |
 | `/screen.php?id=&v=&a=` | VIEW | Trình xem một phiên bản (COMMENT mới có công cụ) |
 | `/compare.php?screen=&left=&right=&mode=side\|swipe\|onion` | VIEW | Hai phiên bản cạnh nhau, thanh trượt hoặc chồng mờ |

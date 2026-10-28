@@ -22,7 +22,7 @@ final class Auth
             return null;
         }
         if ($cache === null || (int) $cache['id'] !== (int) $_SESSION['user_id']) {
-            $cache = fetchOne($c, 'SELECT id, email, name, title, created_at FROM users WHERE id = $1', [(int) $_SESSION['user_id']]);
+            $cache = fetchOne($c, 'SELECT id, email, name, title, created_at, is_support FROM users WHERE id = $1', [(int) $_SESSION['user_id']]);
         }
         return $cache;
     }

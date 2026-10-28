@@ -5,9 +5,31 @@
 ## [Unreleased]
 
 ### Dự kiến
-- Gửi email mời thành viên chưa có tài khoản.
+- Gửi email mời thành viên chưa có tài khoản (hiện lời mời chỉ hiện trong ứng dụng).
 - Phân trang trang Tìm góp ý khi dự án có hàng nghìn góp ý.
 - Thông báo thời gian thực khi có trả lời mới.
+
+## [2.2.0] - 2026-10-24
+
+### Thêm
+- **Lời mời phải được chấp nhận**: Quản lý dự án gửi lời mời (kèm lời nhắn); người được mời nhận thông báo, thấy lời mời ở đầu
+  trang Dự án và bấm **Chấp nhận** hoặc **Từ chối**. Trước khi chấp nhận, người đó chưa là thành viên và không mở được dự án.
+  Quản lý thấy mục “Đang chờ xác nhận” và có thể huỷ lời mời; người mời nhận thông báo khi lời mời được trả lời.
+- **Bộ phận hỗ trợ**: tài khoản có quyền hỗ trợ (mẫu `hotro@pinpoint.test` / `Pinpoint@123`) có thêm menu **Xử lý yêu cầu**
+  (`/support_admin.php`): xem mọi yêu cầu, lọc theo trạng thái, trả lời và đổi trạng thái. Nhân viên hỗ trợ nhận thông báo khi có
+  yêu cầu mới; người gửi nhận thông báo khi có câu trả lời và thấy tên người trả lời.
+- **Lịch chọn ngày tiếng Việt** của ứng dụng (Tháng 10, 2026 · T2…CN · Hôm nay · Xoá hạn), dùng được bằng bàn phím,
+  thay cho lịch gốc tiếng Anh của trình duyệt.
+- `php tools/support.php grant <email>` / `revoke <email>` để cấp hoặc thu hồi quyền hỗ trợ.
+
+### Thay đổi
+- **Hạn xử lý theo dạng tháng/ngày/năm (mm/dd/yyyy)** ở ô nhập, danh sách góp ý, trang Việc của tôi, Tìm góp ý, nhật ký hoạt động
+  và tệp CSV (cột “Hạn xử lý (tháng/ngày/năm)”). Máy chủ vẫn lưu dạng `yyyy-mm-dd`.
+- `bash lab.sh setup` trên CSDL đã có dữ liệu sẽ tạo tài khoản bộ phận hỗ trợ nếu chưa có (không đụng tới dữ liệu khác).
+
+### Sửa
+- Mời thành viên trước đây thêm ngay người được mời vào dự án mà không cần họ đồng ý.
+- Yêu cầu hỗ trợ không có ai xử lý trong ứng dụng (chỉ trả lời được bằng dòng lệnh).
 
 ## [2.1.0] - 2026-10-24
 

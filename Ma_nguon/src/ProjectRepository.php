@@ -96,20 +96,106 @@ final class ProjectRepository
             [$projectId]);
     }
 
-    /** Mời thành viên đã có tài khoản bằng email. Nếu đã là thành viên thì cập nhật quyền. */
-    public function addMember(int $projectId, string $email, string $role, int $byUserId): array
+    /**
+     * Mời thành viên bằng email (bản 2.2): tạo LỜI MỜI đang chờ, người được mời phải bấm Chấp nhận mới trở thành
+     * thành viên. Nếu người đó đã là thành viên thì chỉ đổi quyền. Nếu đã có lời mời đang chờ thì cập nhật quyền
+     * trong lời mời và gửi lại thông báo.
+     * @return array{status:string,name:string,user_id:int}  status: INVITED | RESENT | ROLE_UPDATED
+     */
+    public function invite(int $projectId, string $email, string $role, int $byUserId, string $message = ''): array
     {
         $this->assertRole($role);
         $user = fetchOne($this->c, 'SELECT id, name FROM users WHERE email = $1', [strtolower(trim($email))]);
         if ($user === null) {
             throw new AppError('USER_NOT_FOUND', 422);
         }
-        $this->guardOwner($projectId, (int) $user['id'], $role);
-        queryParams($this->c,
-            'INSERT INTO project_members (project_id, user_id, role, added_by) VALUES ($1, $2, $3, $4)
-             ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role',
-            [$projectId, (int) $user['id'], $role, $byUserId]);
-        return $user;
+        $uid = (int) $user['id'];
+        $message = mb_substr(trim($message), 0, 300);
+        return transaction($this->c, function () use ($projectId, $uid, $user, $role, $byUserId, $message): array {
+            if (Access::roleFor($this->c, $uid, $projectId) !== null) {
+                $this->changeRole($projectId, $uid, $role);
+                return ['status' => 'ROLE_UPDATED', 'name' => $user['name'], 'user_id' => $uid];
+            }
+            $pending = fetchOne($this->c,
+                "SELECT id FROM project_invitations WHERE project_id = $1 AND user_id = $2 AND status = 'PENDING' FOR UPDATE", [$projectId, $uid]);
+            if ($pending !== null) {
+                queryParams($this->c, 'UPDATE project_invitations SET role = $2, invited_by = $3, message = $4, created_at = now() WHERE id = $1',
+                    [(int) $pending['id'], $role, $byUserId, $message]);
+                $status = 'RESENT';
+            } else {
+                queryParams($this->c,
+                    'INSERT INTO project_invitations (project_id, user_id, role, invited_by, message) VALUES ($1, $2, $3, $4, $5)',
+                    [$projectId, $uid, $role, $byUserId, $message]);
+                $status = 'INVITED';
+            }
+            $name = $this->find($projectId)['name'];
+            (new NotificationRepository($this->c))->notifyProject($uid, $byUserId, 'INVITE', $projectId,
+                $name . ' · quyền ' . Access::LABELS[$role] . ($message !== '' ? ' — ' . $message : ''));
+            return ['status' => $status, 'name' => $user['name'], 'user_id' => $uid];
+        });
+    }
+
+    /** Lời mời đang chờ của một dự án (hiển thị cho Quản lý). */
+    public function pendingInvitations(int $projectId): array
+    {
+        return fetchAll($this->c,
+            "SELECT i.id, i.role, i.created_at, u.id AS user_id, u.name, u.email, ib.name AS invited_by
+               FROM project_invitations i JOIN users u ON u.id = i.user_id LEFT JOIN users ib ON ib.id = i.invited_by
+              WHERE i.project_id = $1 AND i.status = 'PENDING' ORDER BY i.id", [$projectId]);
+    }
+
+    /** Lời mời đang chờ gửi tới một người. */
+    public function invitationsFor(int $userId): array
+    {
+        return fetchAll($this->c,
+            "SELECT i.id, i.role, i.message, i.created_at, p.id AS project_id, p.name AS project_name, p.description,
+                    ib.id AS invited_by_id, ib.name AS invited_by,
+                    (SELECT COUNT(*) FROM screens s WHERE s.project_id = p.id) AS screens,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.project_id = p.id) AS members
+               FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN users ib ON ib.id = i.invited_by
+              WHERE i.user_id = $1 AND i.status = 'PENDING' ORDER BY i.id DESC", [$userId]);
+    }
+
+    /**
+     * Người được mời chấp nhận / từ chối. Chỉ chính người được mời, chỉ lời mời đang chờ.
+     * Chấp nhận thì thêm vào project_members với quyền ghi trong lời mời. @return int project_id
+     */
+    public function respondInvitation(int $invitationId, int $userId, bool $accept): int
+    {
+        return transaction($this->c, function () use ($invitationId, $userId, $accept): int {
+            $inv = fetchOne($this->c,
+                "SELECT i.id, i.project_id, i.role, i.invited_by, p.name FROM project_invitations i JOIN projects p ON p.id = i.project_id
+                  WHERE i.id = $1 AND i.user_id = $2 AND i.status = 'PENDING' FOR UPDATE OF i", [$invitationId, $userId]);
+            if ($inv === null) {
+                throw new AppError('INVITATION_NOT_FOUND', 404);
+            }
+            $projectId = (int) $inv['project_id'];
+            if ($accept) {
+                queryParams($this->c,
+                    'INSERT INTO project_members (project_id, user_id, role, added_by) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, user_id) DO NOTHING',
+                    [$projectId, $userId, $inv['role'], $inv['invited_by']]);
+            }
+            queryParams($this->c, 'UPDATE project_invitations SET status = $2, responded_at = now() WHERE id = $1',
+                [$invitationId, $accept ? 'ACCEPTED' : 'DECLINED']);
+            if ($inv['invited_by'] !== null) {
+                (new NotificationRepository($this->c))->notifyProject((int) $inv['invited_by'], $userId, 'INVITE_REPLY', $projectId,
+                    ($accept ? 'Đã chấp nhận' : 'Đã từ chối') . ' lời mời vào ' . $inv['name']);
+            }
+            return $projectId;
+        });
+    }
+
+    /** Quản lý huỷ một lời mời đang chờ của dự án mình. */
+    public function cancelInvitation(int $projectId, int $invitationId): void
+    {
+        $r = queryParams($this->c,
+            "UPDATE project_invitations SET status = 'CANCELLED', responded_at = now() WHERE id = $1 AND project_id = $2 AND status = 'PENDING'",
+            [$invitationId, $projectId]);
+        if (pg_affected_rows($r) !== 1) {
+            throw new AppError('INVITATION_NOT_FOUND', 404);
+        }
+        queryParams($this->c, "DELETE FROM notifications WHERE kind = 'INVITE' AND project_id = $1 AND read_at IS NULL
+                                 AND user_id = (SELECT user_id FROM project_invitations WHERE id = $2)", [$projectId, $invitationId]);
     }
 
     public function changeRole(int $projectId, int $userId, string $role): void

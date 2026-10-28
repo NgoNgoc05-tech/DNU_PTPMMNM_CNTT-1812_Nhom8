@@ -14,6 +14,8 @@ viết nhận xét và trao đổi tại đó. Khi người thiết kế tải b
 mỗi góp ý có **ưu tiên, nhãn, người phụ trách, hạn và ghi chú xử lý**, thả cảm xúc, @nhắc tên, nhật ký hoạt động đầy đủ, so sánh
 **thanh trượt / chồng mờ**, bảng tổng quan tiến độ, trang “Việc của tôi” và giao diện tối. **Bản 2.1** thêm thông báo khi được
 @nhắc tên/giao việc, xoá ảnh tải nhầm, hồ sơ cá nhân, trang hỗ trợ khách hàng và trợ lý ảo trả lời câu hỏi về ứng dụng.
+**Bản 2.2** bắt buộc người được mời **chấp nhận lời mời** mới vào dự án, thêm **bộ phận hỗ trợ** xử lý yêu cầu ngay trong ứng dụng
+và **lịch tiếng Việt** cho hạn xử lý theo dạng tháng/ngày/năm.
 Xem [CHANGELOG](CHANGELOG.md).
 
 ## Chức năng
@@ -26,6 +28,7 @@ Xem [CHANGELOG](CHANGELOG.md).
 | 4 | Tải phiên bản mới, giữ ảnh cũ cùng góp ý; **đặt hai phiên bản cạnh nhau**; ghi nhận phiên bản dùng để kiểm tra sau sửa | Chế độ **thanh trượt** và **chồng mờ** | `compare.php` |
 | 5 | **Lưu lịch sử**, tìm góp ý chưa xử lý, **xuất CSV** gồm nội dung, vị trí, người viết, trạng thái, phiên bản | Nhật ký mọi thay đổi, “Việc của tôi”, lọc quá hạn, CSV 22 cột, in/PDF | `issues.php`, `inbox.php`, `export.php` |
 | + | Tiện ích người dùng (bản 2.1) | Thông báo @nhắc tên / giao việc / trả lời, xoá ảnh tải nhầm, hồ sơ, hỗ trợ khách hàng, trợ lý ảo | `notifications.php`, `delete.php`, `profile.php`, `help.php` |
+| + | Lời mời và bộ phận hỗ trợ (bản 2.2) | Người được mời chấp nhận / từ chối; nhân viên hỗ trợ xem, trả lời, đổi trạng thái yêu cầu | `invitation.php`, `support_admin.php` |
 
 Hai yêu cầu kỹ thuật:
 
@@ -52,6 +55,7 @@ bash lab.sh run           # mở http://127.0.0.1:8115
 ```
 
 Đăng nhập bằng `designer@pinpoint.test`, `reviewer@pinpoint.test` hoặc `viewer@pinpoint.test`. Mật khẩu của cả ba là `Pinpoint@123`.
+Tài khoản bộ phận hỗ trợ (trả lời yêu cầu hỗ trợ ở menu **Xử lý yêu cầu**): `hotro@pinpoint.test` / `Pinpoint@123`.
 
 Kiểm thử (mở terminal thứ hai):
 
@@ -70,6 +74,7 @@ bash lab.sh e2e           # trình duyệt thật: 2 tình huống + phép thử
 | ![Ghi chú xử lý và trao đổi](Hinh_anh/note.png) | ![So sánh thanh trượt](Hinh_anh/swipe.png) |
 | ![Tìm góp ý](Hinh_anh/issues.png) | ![Giao diện tối](Hinh_anh/dark.png) |
 | ![Thông báo khi được @nhắc tên](Hinh_anh/notifications.png) | ![Hỗ trợ và trợ lý ảo](Hinh_anh/help.png) |
+| ![Lịch tiếng Việt cho hạn xử lý](Hinh_anh/due-calendar.png) | ![Bộ phận hỗ trợ xử lý yêu cầu](Hinh_anh/support-desk.png) |
 
 ## Tài liệu
 
@@ -93,6 +98,7 @@ Ma_nguon/
 ├── public/                trang web (document root): login, projects, project, screen, compare, issues, export, api, image, calibration
 │   ├── inbox.php, project_edit.php   Việc của tôi; sửa dự án / đổi tên màn hình (bản 2.0)
 │   ├── notifications.php, delete.php, profile.php, help.php   Thông báo, xoá, hồ sơ, hỗ trợ (bản 2.1)
+│   ├── invitation.php, support_admin.php      Trả lời lời mời, bộ phận hỗ trợ (bản 2.2)
 │   └── assets/js/         coords.js (toạ độ), annotator.js (khung ảnh), thread.js (bảng góp ý), screen.js, compare.js, ui.js, theme-init.js
 ├── src/                   Database, Access (quyền), Coordinates, ImageStore, *Repository, Export, Seeder, View (hiển thị dùng chung), NotificationRepository, SupportRepository, Assistant (trợ lý ảo)
 ├── templates/             header.php, footer.php

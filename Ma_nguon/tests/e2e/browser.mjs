@@ -203,14 +203,28 @@ try {
   const pillsAfter = await designer.$$eval('.version-pills a', (l) => l.length);
   check(pillsAfter === pillsBefore - 1, 'v21-delete-wrong-version', `${pillsBefore}->${pillsAfter}`);
 
-  // Bản 2.1: hạn xử lý nhập theo ngày/tháng/năm
+  // Bản 2.2: hạn xử lý nhập theo tháng/ngày/năm + lịch tiếng Việt
   await designer.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
   await designer.waitForSelector('.props .date-field input');
   const saved = designer.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
-  await designer.fill('.props .date-field input', '05/11/2030');
+  await designer.fill('.props .date-field input', '11/05/2030');
   await designer.press('.props .date-field input', 'Enter');
   const dueItem = (await (await saved).json()).item;
-  check(dueItem.due_date === '2030-11-05', 'v21-due-date-dd-mm-yyyy', String(dueItem.due_date));
+  check(dueItem.due_date === '2030-11-05', 'v22-due-date-mm-dd-yyyy', String(dueItem.due_date));
+  await designer.waitForSelector('.props .date-field input');
+  check(await designer.inputValue('.props .date-field input') === '11/05/2030', 'v22-due-date-shown-mm-dd-yyyy');
+  await designer.click('.props .date-field .date-btn');
+  await designer.waitForSelector('.cal-pop');
+  const calTitle = await designer.textContent('.cal-title');
+  const calWd = await designer.$$eval('.cal-wd', (l) => l.map((x) => x.textContent).join(' '));
+  check(calTitle === 'Tháng 11, 2030' && calWd === 'T2 T3 T4 T5 T6 T7 CN', 'v22-vietnamese-calendar', `${calTitle} | ${calWd}`);
+  check(await designer.$('input[type=date]') === null, 'v22-no-native-english-picker');
+  const saved2 = designer.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await designer.click('.cal-day[data-iso="2030-11-20"]');
+  const dueItem2 = (await (await saved2).json()).item;
+  await designer.waitForFunction(() => document.querySelector('.props .date-field input')?.value === '11/20/2030');
+  check(dueItem2.due_date === '2030-11-20' && await designer.$('.cal-pop') === null, 'v22-calendar-pick-saves', String(dueItem2.due_date));
+  await designer.screenshot({ path: path.join(OUT, 'v22-due.png') });
 
   // Bản 2.1: @nhắc tên -> người được nhắc thấy thông báo ở chuông
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
@@ -231,6 +245,53 @@ try {
   await designer.click('#chat-form button[type=submit]');
   await designer.waitForSelector('.from-bot:has-text("Xoá phiên bản đang xem")');
   check(true, 'v21-assistant-answers');
+
+  // Bản 2.2: lời mời phải được người nhận chấp nhận
+  const projName = 'E2E lời mời ' + Date.now();
+  await designer.goto(`${BASE}/projects.php`);
+  await designer.click('.page-head [data-open=dlg-new-project]');
+  await designer.fill('#dlg-new-project #name', projName);
+  await Promise.all([designer.waitForNavigation(), designer.click('#dlg-new-project button[type=submit]')]);
+  const newProjectUrl = designer.url();
+  await designer.fill('#memail', 'viewer@pinpoint.test');
+  await designer.selectOption('#mrole', 'COMMENT');
+  await designer.fill('input[name=message]', 'Nhờ bạn góp ý giúp');
+  await Promise.all([designer.waitForNavigation(), designer.click('form[action="/members.php"].mt button[type=submit]')]);
+  check((await designer.textContent('.pending-list')).includes('Phạm Gia Huy'), 'v22-invite-pending-for-manager');
+  await viewer.goto(`${BASE}/projects.php`);
+  check(!(await viewer.textContent('.grid')).includes(projName), 'v22-invitee-not-member-before-accept');
+  const card = viewer.locator(`.invite-card:has-text("${projName}")`);
+  check(await card.count() === 1 && (await card.textContent()).includes('Nhờ bạn góp ý giúp'), 'v22-invitee-sees-invitation');
+  await viewer.goto(newProjectUrl);
+  check((await viewer.textContent('main')).includes('Không tìm thấy'), 'v22-invitee-cannot-open-before-accept');
+  await viewer.goto(`${BASE}/projects.php`);
+  await Promise.all([viewer.waitForNavigation(), viewer.locator(`.invite-card:has-text("${projName}") button:has-text("Chấp nhận")`).click()]);
+  check(viewer.url() === newProjectUrl && (await viewer.textContent('h1')).includes(projName), 'v22-accept-opens-project');
+  await designer.reload();
+  check((await designer.$$('.pending-list li')).length === 0 && (await designer.textContent('.member-list')).includes('Phạm Gia Huy'), 'v22-accepted-becomes-member');
+
+  // Bản 2.2: yêu cầu hỗ trợ được bộ phận hỗ trợ xử lý
+  const subject = 'E2E hỗ trợ ' + Date.now();
+  await r.goto(`${BASE}/help.php`);
+  await r.selectOption('#tcat', 'BUG');
+  await r.fill('#tsub', subject);
+  await r.fill('#tmsg', 'Ảnh tải lên bị mờ');
+  await Promise.all([r.waitForNavigation(), r.click('#new-ticket button[type=submit]')]);
+  check((await r.textContent('#tickets')).includes(subject), 'v22-ticket-created');
+  const staff = await login('hotro@pinpoint.test');
+  check(!(await staff.$eval('#notif-count', (n) => n.hidden)), 'v22-support-notified');
+  await staff.goto(`${BASE}/support_admin.php`);
+  const tk = staff.locator(`.ticket-admin:has-text("${subject}")`);
+  check(await tk.count() === 1, 'v22-support-desk-lists-ticket');
+  await tk.locator('textarea').fill('Chào bạn, hãy tải ảnh PNG gốc độ phân giải cao.');
+  await Promise.all([staff.waitForNavigation(), tk.locator('button[type=submit]').click()]);
+  await staff.screenshot({ path: path.join(OUT, 'v22-support-desk.png'), fullPage: false });
+  await r.goto(`${BASE}/help.php`);
+  const mine = r.locator(`#tickets li:has-text("${subject}")`);
+  check((await mine.textContent()).includes('Đã trả lời') && (await mine.textContent()).includes('ảnh PNG gốc'), 'v22-user-sees-reply');
+  check(!(await r.$eval('#notif-count', (n) => n.hidden)), 'v22-user-notified-of-reply');
+  const denied = await viewer.goto(`${BASE}/support_admin.php`);
+  check(denied.status() === 403, 'v22-support-desk-forbidden-for-normal-user', String(denied.status()));
 
   // Lọc trạng thái phía trình duyệt + giao diện tối
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);

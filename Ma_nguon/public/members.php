@@ -15,8 +15,16 @@ $repo = new ProjectRepository($c);
 try {
     switch (field($_POST, 'action')) {
         case 'add':
-            $m = $repo->addMember($projectId, field($_POST, 'email'), field($_POST, 'role'), $user['id']);
-            flash('Đã thêm ' . $m['name'] . ' vào dự án.');
+            $m = $repo->invite($projectId, field($_POST, 'email'), field($_POST, 'role'), $user['id'], field($_POST, 'message'));
+            flash(match ($m['status']) {
+                'ROLE_UPDATED' => $m['name'] . ' đã là thành viên — đã cập nhật quyền.',
+                'RESENT' => 'Đã gửi lại lời mời cho ' . $m['name'] . '.',
+                default => 'Đã gửi lời mời cho ' . $m['name'] . '. Người này cần bấm Chấp nhận mới trở thành thành viên.',
+            });
+            break;
+        case 'cancel_invite':
+            $repo->cancelInvitation($projectId, intField($_POST, 'invitation_id'));
+            flash('Đã huỷ lời mời.');
             break;
         case 'role':
             $repo->changeRole($projectId, intField($_POST, 'user_id'), field($_POST, 'role'));

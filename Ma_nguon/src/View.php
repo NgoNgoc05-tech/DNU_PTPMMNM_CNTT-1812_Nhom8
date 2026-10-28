@@ -124,7 +124,7 @@ function dueBadge(?string $date, bool $overdue): string
     if ($date === null || $date === '') {
         return '';
     }
-    return '<span class="due' . ($overdue ? ' is-overdue' : '') . '">' . icon('calendar') . e(date('d/m', (int) strtotime($date)))
+    return '<span class="due' . ($overdue ? ' is-overdue' : '') . '">' . icon('calendar') . e(date('m/d', (int) strtotime($date)))
         . ($overdue ? ' · quá hạn' : '') . '</span>';
 }
 
