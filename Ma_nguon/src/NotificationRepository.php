@@ -12,7 +12,11 @@ declare(strict_types=1);
  */
 final class NotificationRepository
 {
-    public const KINDS = ['MENTION' => 'nhắc tới bạn', 'ASSIGNED' => 'giao việc cho bạn', 'REPLY' => 'trả lời', 'STATUS' => 'đổi trạng thái'];
+    public const KINDS = [
+        'MENTION' => 'nhắc tới bạn', 'ASSIGNED' => 'giao việc cho bạn', 'REPLY' => 'trả lời', 'STATUS' => 'đổi trạng thái',
+        'INVITE' => 'mời bạn tham gia dự án', 'INVITE_REPLY' => 'trả lời lời mời',
+        'TICKET' => 'gửi yêu cầu hỗ trợ', 'TICKET_REPLY' => 'trả lời yêu cầu hỗ trợ của bạn',
+    ];
 
     public function __construct(private PgSql\Connection $c)
     {
@@ -72,31 +76,73 @@ final class NotificationRepository
         return $sent;
     }
 
+    /** Thông báo gắn với dự án (lời mời, trả lời lời mời). */
+    public function notifyProject(int $userId, int $actorId, string $kind, int $projectId, string $body): void
+    {
+        if ($userId === $actorId || !in_array($kind, ['INVITE', 'INVITE_REPLY'], true)) {
+            return;
+        }
+        queryParams($this->c, 'INSERT INTO notifications (user_id, actor_id, kind, project_id, body) VALUES ($1, $2, $3, $4, $5)',
+            [$userId, $actorId, $kind, $projectId, mb_substr($body, 0, 300)]);
+    }
+
+    /** Thông báo về yêu cầu hỗ trợ. $actorId = 0 khi trả lời từ dòng lệnh. */
+    public function notifyTicket(int $userId, int $actorId, string $kind, int $ticketId, string $body): void
+    {
+        if ($userId === $actorId || !in_array($kind, ['TICKET', 'TICKET_REPLY'], true)) {
+            return;
+        }
+        queryParams($this->c, 'INSERT INTO notifications (user_id, actor_id, kind, ticket_id, body) VALUES ($1, $2, $3, $4, $5)',
+            [$userId, $actorId > 0 ? $actorId : null, $kind, $ticketId, mb_substr($body, 0, 300)]);
+    }
+
     public function unreadCount(int $userId): int
     {
         return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [$userId])['n'];
     }
 
-    public function listFor(int $userId, int $limit = 20, bool $unreadOnly = false): array
+    public function latestId(int $userId): int
+    {
+        return (int) (fetchOne($this->c, 'SELECT COALESCE(MAX(id), 0) AS n FROM notifications WHERE user_id = $1', [$userId])['n'] ?? 0);
+    }
+
+    /** Bản 2.3: thông báo mới hơn $afterId (chuông tự cập nhật vài giây một lần). */
+    public function since(int $userId, int $afterId, int $limit = 5): array
+    {
+        return array_values(array_filter($this->listFor($userId, $limit, false, $afterId), fn ($n) => !$n['read']));
+    }
+
+    public function listFor(int $userId, int $limit = 20, bool $unreadOnly = false, int $afterId = 0): array
     {
         $rows = fetchAll($this->c,
             'SELECT n.id, n.kind, n.body, n.created_at, n.read_at, n.annotation_id, u.id AS actor_id, u.name AS actor,
-                    a.seq_no, v.id AS version_id, v.version_no, s.id AS screen_id, s.name AS screen_name, p.name AS project_name
+                    a.seq_no, v.id AS version_id, v.version_no, s.id AS screen_id, s.name AS screen_name,
+                    COALESCE(p.name, pp.name) AS project_name, n.project_id, n.ticket_id, t.subject AS ticket_subject
                FROM notifications n
+               LEFT JOIN projects pp ON pp.id = n.project_id
+               LEFT JOIN support_tickets t ON t.id = n.ticket_id
                LEFT JOIN users u ON u.id = n.actor_id
                LEFT JOIN annotations a ON a.id = n.annotation_id
                LEFT JOIN image_versions v ON v.id = a.image_version_id
                LEFT JOIN screens s ON s.id = v.screen_id
                LEFT JOIN projects p ON p.id = s.project_id
-              WHERE n.user_id = $1' . ($unreadOnly ? ' AND n.read_at IS NULL' : '') . '
-              ORDER BY n.id DESC LIMIT $2', [$userId, $limit]);
+              WHERE n.user_id = $1 AND n.id > $3' . ($unreadOnly ? ' AND n.read_at IS NULL' : '') . '
+              ORDER BY n.id DESC LIMIT $2', [$userId, $limit, $afterId]);
         return array_map(fn ($r) => [
-            'id' => (int) $r['id'], 'kind' => $r['kind'], 'label' => self::KINDS[$r['kind']], 'body' => $r['body'],
+            'id' => (int) $r['id'], 'kind' => $r['kind'], 'annotation_id' => $r['annotation_id'] === null ? null : (int) $r['annotation_id'],
+            'version_id' => $r['version_id'] === null ? null : (int) $r['version_id'], 'label' => self::KINDS[$r['kind']], 'body' => $r['body'],
             'created_at' => $r['created_at'], 'read' => $r['read_at'] !== null,
-            'actor' => $r['actor'], 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
-            'link' => $r['screen_id'] === null ? null
-                : '/screen.php?id=' . (int) $r['screen_id'] . '&v=' . (int) $r['version_id'] . '&a=' . (int) $r['annotation_id'],
-            'where' => $r['screen_id'] === null ? '' : $r['project_name'] . ' · ' . $r['screen_name'] . ' v' . $r['version_no'] . ' #' . $r['seq_no'],
+            'actor' => $r['actor'] ?? (in_array($r['kind'], ['TICKET_REPLY'], true) ? 'Bộ phận hỗ trợ' : null), 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
+            'link' => match (true) {
+                $r['kind'] === 'INVITE' => '/projects.php#invites',
+                $r['kind'] === 'TICKET' => '/support_admin.php#t' . (int) $r['ticket_id'],
+                $r['kind'] === 'TICKET_REPLY' => '/help.php#tickets',
+                $r['kind'] === 'INVITE_REPLY' && $r['project_id'] !== null => '/project.php?id=' . (int) $r['project_id'],
+                $r['screen_id'] !== null => '/screen.php?id=' . (int) $r['screen_id'] . '&v=' . (int) $r['version_id'] . '&a=' . (int) $r['annotation_id'],
+                default => null,
+            },
+            'where' => $r['screen_id'] !== null ? $r['project_name'] . ' · ' . $r['screen_name'] . ' v' . $r['version_no'] . ' #' . $r['seq_no']
+                : ($r['ticket_id'] !== null ? 'Yêu cầu #' . (int) $r['ticket_id'] : (string) ($r['project_name'] ?? '')),
         ], $rows);
     }
 

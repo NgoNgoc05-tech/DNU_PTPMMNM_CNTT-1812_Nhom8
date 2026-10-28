@@ -186,3 +186,90 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 
 -- Hồ sơ: chức danh / giới thiệu ngắn hiển thị cho thành viên cùng dự án.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS title varchar(120) NOT NULL DEFAULT '';
+
+-- ===================== Phiên bản 2.2: lời mời tham gia dự án cần người được mời xác nhận =====================
+CREATE TABLE IF NOT EXISTS project_invitations (
+    id           bigserial PRIMARY KEY,
+    project_id   bigint NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id      bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role         varchar(10) NOT NULL CHECK (role IN ('VIEW', 'COMMENT', 'ADMIN')),
+    invited_by   bigint REFERENCES users(id) ON DELETE SET NULL,
+    status       varchar(10) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED')),
+    message      varchar(300) NOT NULL DEFAULT '',
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    responded_at timestamptz
+);
+-- Mỗi người chỉ có tối đa một lời mời đang chờ cho mỗi dự án.
+CREATE UNIQUE INDEX IF NOT EXISTS project_invitations_one_pending ON project_invitations (project_id, user_id) WHERE status = 'PENDING';
+
+-- Thông báo về lời mời: gắn với dự án thay vì góp ý.
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS project_id bigint REFERENCES projects(id) ON DELETE CASCADE;
+-- Loại thông báo mới dài hơn 10 ký tự (INVITE_REPLY, TICKET_REPLY).
+ALTER TABLE notifications ALTER COLUMN kind TYPE varchar(20);
+
+-- Bộ phận hỗ trợ: tài khoản có is_support = true xem và trả lời mọi yêu cầu hỗ trợ (không cần thuộc dự án nào).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_support boolean NOT NULL DEFAULT false;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS handled_by bigint REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS ticket_id bigint REFERENCES support_tickets(id) ON DELETE CASCADE;
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_kind_check
+    CHECK (kind IN ('MENTION', 'ASSIGNED', 'REPLY', 'STATUS', 'INVITE', 'INVITE_REPLY', 'TICKET', 'TICKET_REPLY'));
+
+-- =====================================================================
+-- Bản 2.3: mũi tên / vẽ tay, ảnh đính kèm trả lời, quên mật khẩu, quản trị hệ thống
+-- =====================================================================
+
+-- Mũi tên (ARROW: [[x1,y1],[x2,y2]]) và nét vẽ tay (DRAW: tối đa 500 điểm), theo pixel ảnh gốc.
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS points jsonb;
+ALTER TABLE annotations DROP CONSTRAINT IF EXISTS annotations_shape_check;
+ALTER TABLE annotations DROP CONSTRAINT IF EXISTS annotations_check;
+ALTER TABLE annotations DROP CONSTRAINT IF EXISTS annotations_geometry_check;
+ALTER TABLE annotations ADD CONSTRAINT annotations_shape_check CHECK (shape IN ('POINT', 'RECT', 'ARROW', 'DRAW'));
+ALTER TABLE annotations ADD CONSTRAINT annotations_geometry_check CHECK (
+       (shape = 'POINT' AND w IS NULL AND h IS NULL AND points IS NULL)
+    OR (shape = 'RECT' AND w > 0 AND h > 0 AND points IS NULL)
+    OR (shape IN ('ARROW', 'DRAW') AND w IS NULL AND h IS NULL AND points IS NOT NULL AND jsonb_typeof(points) = 'array'));
+
+-- Ảnh đính kèm trong nhận xét / trả lời (ảnh chụp màn hình), lưu như ảnh thiết kế: tên tệp ngẫu nhiên, kiểm tra quyền khi phát.
+CREATE TABLE IF NOT EXISTS comment_attachments (
+    id            bigserial PRIMARY KEY,
+    comment_id    bigint NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+    stored_name   varchar(80) NOT NULL UNIQUE,
+    original_name varchar(255) NOT NULL,
+    mime_type     varchar(20) NOT NULL CHECK (mime_type IN ('image/png', 'image/jpeg')),
+    width         integer NOT NULL CHECK (width > 0),
+    height        integer NOT NULL CHECK (height > 0),
+    byte_size     integer NOT NULL CHECK (byte_size > 0),
+    uploaded_by   bigint NOT NULL REFERENCES users(id),
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS comment_attachments_comment ON comment_attachments (comment_id);
+
+-- Quản trị hệ thống và khoá tài khoản.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_reason varchar(300) NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+
+-- Đặt lại mật khẩu: chỉ lưu SHA-256 của mã; mã dùng một lần, hết hạn sau 30 phút.
+CREATE TABLE IF NOT EXISTS password_resets (
+    id          bigserial PRIMARY KEY,
+    user_id     bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  char(64) NOT NULL UNIQUE,
+    created_by  bigint REFERENCES users(id) ON DELETE SET NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    expires_at  timestamptz NOT NULL,
+    used_at     timestamptz
+);
+CREATE INDEX IF NOT EXISTS password_resets_user ON password_resets (user_id);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS is_password_reset boolean NOT NULL DEFAULT false;
+
+-- Nhật ký thao tác quản trị (ai khoá ai, xoá dự án nào...).
+CREATE TABLE IF NOT EXISTS admin_log (
+    id         bigserial PRIMARY KEY,
+    admin_id   bigint REFERENCES users(id) ON DELETE SET NULL,
+    action     varchar(30) NOT NULL,
+    target     varchar(200) NOT NULL DEFAULT '',
+    detail     varchar(300) NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+);

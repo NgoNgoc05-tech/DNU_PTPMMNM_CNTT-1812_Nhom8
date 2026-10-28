@@ -203,14 +203,28 @@ try {
   const pillsAfter = await designer.$$eval('.version-pills a', (l) => l.length);
   check(pillsAfter === pillsBefore - 1, 'v21-delete-wrong-version', `${pillsBefore}->${pillsAfter}`);
 
-  // Bản 2.1: hạn xử lý nhập theo ngày/tháng/năm
+  // Bản 2.2: hạn xử lý nhập theo tháng/ngày/năm + lịch tiếng Việt
   await designer.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
   await designer.waitForSelector('.props .date-field input');
   const saved = designer.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
-  await designer.fill('.props .date-field input', '05/11/2030');
+  await designer.fill('.props .date-field input', '11/05/2030');
   await designer.press('.props .date-field input', 'Enter');
   const dueItem = (await (await saved).json()).item;
-  check(dueItem.due_date === '2030-11-05', 'v21-due-date-dd-mm-yyyy', String(dueItem.due_date));
+  check(dueItem.due_date === '2030-11-05', 'v22-due-date-mm-dd-yyyy', String(dueItem.due_date));
+  await designer.waitForSelector('.props .date-field input');
+  check(await designer.inputValue('.props .date-field input') === '11/05/2030', 'v22-due-date-shown-mm-dd-yyyy');
+  await designer.click('.props .date-field .date-btn');
+  await designer.waitForSelector('.cal-pop');
+  const calTitle = await designer.textContent('.cal-title');
+  const calWd = await designer.$$eval('.cal-wd', (l) => l.map((x) => x.textContent).join(' '));
+  check(calTitle === 'Tháng 11, 2030' && calWd === 'T2 T3 T4 T5 T6 T7 CN', 'v22-vietnamese-calendar', `${calTitle} | ${calWd}`);
+  check(await designer.$('input[type=date]') === null, 'v22-no-native-english-picker');
+  const saved2 = designer.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await designer.click('.cal-day[data-iso="2030-11-20"]');
+  const dueItem2 = (await (await saved2).json()).item;
+  await designer.waitForFunction(() => document.querySelector('.props .date-field input')?.value === '11/20/2030');
+  check(dueItem2.due_date === '2030-11-20' && await designer.$('.cal-pop') === null, 'v22-calendar-pick-saves', String(dueItem2.due_date));
+  await designer.screenshot({ path: path.join(OUT, 'v22-due.png') });
 
   // Bản 2.1: @nhắc tên -> người được nhắc thấy thông báo ở chuông
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${item.id}`);
@@ -231,6 +245,186 @@ try {
   await designer.click('#chat-form button[type=submit]');
   await designer.waitForSelector('.from-bot:has-text("Xoá phiên bản đang xem")');
   check(true, 'v21-assistant-answers');
+
+  // Bản 2.2: lời mời phải được người nhận chấp nhận
+  const projName = 'E2E lời mời ' + Date.now();
+  await designer.goto(`${BASE}/projects.php`);
+  await designer.click('.page-head [data-open=dlg-new-project]');
+  await designer.fill('#dlg-new-project #name', projName);
+  await Promise.all([designer.waitForNavigation(), designer.click('#dlg-new-project button[type=submit]')]);
+  const newProjectUrl = designer.url();
+  await designer.fill('#memail', 'viewer@pinpoint.test');
+  await designer.selectOption('#mrole', 'COMMENT');
+  await designer.fill('input[name=message]', 'Nhờ bạn góp ý giúp');
+  await Promise.all([designer.waitForNavigation(), designer.click('form[action="/members.php"].mt button[type=submit]')]);
+  check((await designer.textContent('.pending-list')).includes('Phạm Gia Huy'), 'v22-invite-pending-for-manager');
+  await viewer.goto(`${BASE}/projects.php`);
+  check(!(await viewer.textContent('.grid')).includes(projName), 'v22-invitee-not-member-before-accept');
+  const card = viewer.locator(`.invite-card:has-text("${projName}")`);
+  check(await card.count() === 1 && (await card.textContent()).includes('Nhờ bạn góp ý giúp'), 'v22-invitee-sees-invitation');
+  await viewer.goto(newProjectUrl);
+  check((await viewer.textContent('main')).includes('Không tìm thấy'), 'v22-invitee-cannot-open-before-accept');
+  await viewer.goto(`${BASE}/projects.php`);
+  await Promise.all([viewer.waitForNavigation(), viewer.locator(`.invite-card:has-text("${projName}") button:has-text("Chấp nhận")`).click()]);
+  check(viewer.url() === newProjectUrl && (await viewer.textContent('h1')).includes(projName), 'v22-accept-opens-project');
+  await designer.reload();
+  check((await designer.$$('.pending-list li')).length === 0 && (await designer.textContent('.member-list')).includes('Phạm Gia Huy'), 'v22-accepted-becomes-member');
+
+  // Bản 2.2: yêu cầu hỗ trợ được bộ phận hỗ trợ xử lý
+  const subject = 'E2E hỗ trợ ' + Date.now();
+  await r.goto(`${BASE}/help.php`);
+  await r.selectOption('#tcat', 'BUG');
+  await r.fill('#tsub', subject);
+  await r.fill('#tmsg', 'Ảnh tải lên bị mờ');
+  await Promise.all([r.waitForNavigation(), r.click('#new-ticket button[type=submit]')]);
+  check((await r.textContent('#tickets')).includes(subject), 'v22-ticket-created');
+  const staff = await login('hotro@pinpoint.test');
+  check(!(await staff.$eval('#notif-count', (n) => n.hidden)), 'v22-support-notified');
+  await staff.goto(`${BASE}/support_admin.php`);
+  const tk = staff.locator(`.ticket-admin:has-text("${subject}")`);
+  check(await tk.count() === 1, 'v22-support-desk-lists-ticket');
+  await tk.locator('textarea').fill('Chào bạn, hãy tải ảnh PNG gốc độ phân giải cao.');
+  await Promise.all([staff.waitForNavigation(), tk.locator('button[type=submit]').click()]);
+  await staff.screenshot({ path: path.join(OUT, 'v22-support-desk.png'), fullPage: false });
+  await r.goto(`${BASE}/help.php`);
+  const mine = r.locator(`#tickets li:has-text("${subject}")`);
+  check((await mine.textContent()).includes('Đã trả lời') && (await mine.textContent()).includes('ảnh PNG gốc'), 'v22-user-sees-reply');
+  check(!(await r.$eval('#notif-count', (n) => n.hidden)), 'v22-user-notified-of-reply');
+  const denied = await viewer.goto(`${BASE}/support_admin.php`);
+  check(denied.status() === 403, 'v22-support-desk-forbidden-for-normal-user', String(denied.status()));
+
+  // ================= Bản 2.3 =================
+  // Mũi tên và nét vẽ tay trên trình xem (toạ độ theo pixel ảnh gốc)
+  await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);
+  await r.waitForSelector('.mark-pin');
+  await r.click('[data-toggle=hideMarks]');
+  const box2 = await r.$eval('.annotator-image', (n) => { const b = n.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width }; });
+  const k2 = box2.w / 1000;
+  await r.click('button[data-tool=arrow]');
+  await r.mouse.move(box2.x + 100 * k2, box2.y + 400 * k2);
+  await r.mouse.down();
+  await r.mouse.move(box2.x + 300 * k2, box2.y + 450 * k2, { steps: 8 });
+  await r.mouse.up();
+  await r.waitForSelector('.composer-pop');
+  await r.fill('textarea[aria-label="Nội dung nhận xét"]', 'E2E: mũi tên — dời nút tới đây');
+  let resp = r.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await r.click('button:has-text("Lưu góp ý")');
+  const arrowItem = (await (await resp).json()).item;
+  const ap = arrowItem.points || [];
+  check(arrowItem.shape === 'ARROW' && ap.length === 2 && Math.abs(ap[0][0] - 100) <= 1.5 && Math.abs(ap[0][1] - 400) <= 1.5
+    && Math.abs(ap[1][0] - 300) <= 1.5 && Math.abs(ap[1][1] - 450) <= 1.5, 'v23-arrow-saved-in-original-pixels', JSON.stringify(ap));
+  await r.click('button[data-tool=draw]');
+  await r.mouse.move(box2.x + 600 * k2, box2.y + 380 * k2);
+  await r.mouse.down();
+  for (let i = 1; i <= 12; i++) { await r.mouse.move(box2.x + (600 + i * 25) * k2, box2.y + (380 + (i % 2 ? 30 : -10)) * k2, { steps: 2 }); }
+  await r.mouse.up();
+  await r.waitForSelector('.composer-pop');
+  await r.fill('textarea[aria-label="Nội dung nhận xét"]', 'E2E: vẽ tay — khoanh cụm này');
+  resp = r.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await r.click('button:has-text("Lưu góp ý")');
+  const drawItem = (await (await resp).json()).item;
+  check(drawItem.shape === 'DRAW' && drawItem.points.length >= 3 && drawItem.points.length <= 500, 'v23-freehand-saved', String(drawItem.points && drawItem.points.length));
+  await r.click('[data-toggle=hideMarks]');
+  await r.waitForSelector(`.mark-stroke[data-stroke="${arrowItem.id}"] path[marker-end]`);
+  check(await r.$(`.mark-stroke[data-stroke="${drawItem.id}"] .stroke-line`) !== null, 'v23-strokes-rendered');
+  await r.click(`.mark-stroke[data-stroke="${arrowItem.id}"] .stroke-hit`, { force: true });
+  await r.waitForSelector('.detail-head, textarea[aria-label="Trả lời"]');
+  check((await r.textContent('#panel-body')).includes('Mũi tên ('), 'v23-click-stroke-opens-thread');
+  await r.screenshot({ path: path.join(OUT, 'v23-draw.png') });
+
+  // Ảnh đính kèm trong trả lời: chọn tệp + dán ảnh chụp (Ctrl+V)
+  await r.setInputFiles('.composer input[type=file]', path.join(FIXTURES, 'a-trang-chu-v2.png'));
+  await r.waitForSelector('.attach-chip img');
+  await r.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 40; c.height = 30;
+    const g = c.getContext('2d'); g.fillStyle = '#4f46e5'; g.fillRect(0, 0, 40, 30);
+    const png = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    const dt = new DataTransfer();
+    dt.items.add(new File([png], '', { type: 'image/png' }));
+    document.querySelector('textarea[aria-label="Trả lời"]').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  check((await r.$$('.attach-chip')).length === 2, 'v23-paste-screenshot-adds-attachment');
+  await r.fill('textarea[aria-label="Trả lời"]', 'E2E: ảnh chụp chỗ cần sửa');
+  await r.click('button:has-text("Gửi trả lời")');
+  await r.waitForSelector('.reply .c-attach img');
+  await r.waitForFunction(() => [...document.querySelectorAll('.reply .c-attach img')].every((i) => i.complete && i.naturalWidth > 0));
+  check((await r.$$('.reply .c-attach')).length === 2, 'v23-attachments-shown-in-reply');
+  await r.screenshot({ path: path.join(OUT, 'v23-attach.png') });
+
+  // Thông báo tức thời: designer đang mở trang khác vẫn thấy thẻ nổi khi bị @nhắc tên
+  await designer.goto(`${BASE}/projects.php`);
+  await r.fill('textarea[aria-label="Trả lời"]', 'E2E: @Nguyễn Thu Trang xem mũi tên giúp');
+  await r.click('button:has-text("Gửi trả lời")');
+  await r.waitForSelector('.reply:has-text("xem mũi tên giúp")');
+  await designer.evaluate(() => window.pinpointPoll());
+  await designer.waitForSelector('.live-card', { timeout: 10000 });
+  check((await designer.textContent('.live-card')).includes('nhắc tới bạn'), 'v23-live-notification-card');
+  check(!(await designer.$eval('#notif-count', (n) => n.hidden)), 'v23-bell-updates-without-reload');
+  await designer.waitForTimeout(400);
+  await designer.screenshot({ path: path.join(OUT, 'v23-live.png') });
+
+  // Tô đỏ chỗ khác nhau giữa v1 và v2
+  await designer.goto(`${BASE}/compare.php?screen=${item.screen_id}&mode=diff`);
+  await designer.waitForFunction(() => /vùng thay đổi/.test(document.getElementById('diff-summary').textContent), null, { timeout: 15000 });
+  const diff = await designer.evaluate(() => { const d = window.pinpointDiff(); return { n: d.regions.length, pct: d.percent, first: d.regions[0] }; });
+  check(diff.n >= 2 && diff.pct > 0 && diff.pct < 60, 'v23-diff-finds-changed-regions', JSON.stringify(diff));
+  // nút "Đặt ngay" ở v1 tâm (750;150) đã dời đi: phải có vùng thay đổi phủ điểm này
+  const covers = await designer.evaluate(() => window.pinpointDiff().regions.some((g) => g.x <= 750 && g.x + g.w >= 750 && g.y <= 150 && g.y + g.h >= 150));
+  check(covers, 'v23-diff-covers-moved-button');
+  await designer.click('.diff-chip[data-region="1"]');
+  check(await designer.evaluate(() => window.pinpointViews.right.state.zoom > 1), 'v23-diff-region-zooms-in');
+  await designer.click('.diff-chip.diff-all');
+  await designer.screenshot({ path: path.join(OUT, 'v23-diff.png') });
+
+  // Quên mật khẩu → bộ phận hỗ trợ cấp link 30 phút → đặt mật khẩu mới
+  const anonCtx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  const anon = await anonCtx.newPage();
+  anon.on('pageerror', (e) => pageErrors.push(`anon: ${e.message}`));
+  await anon.goto(`${BASE}/login.php`);
+  await Promise.all([anon.waitForNavigation(), anon.click('a:has-text("Quên mật khẩu?")')]);
+  await anon.fill('#email', 'viewer@pinpoint.test');
+  await anon.fill('#contact', 'Zalo E2E 0900');
+  await Promise.all([anon.waitForNavigation(), anon.click('button[type=submit]')]);
+  check(await anon.$('[data-forgot-sent]') !== null, 'v23-forgot-request-accepted');
+  const staff2 = await login('hotro@pinpoint.test');
+  await staff2.goto(`${BASE}/support_admin.php?status=OPEN`);
+  const resetTicket = staff2.locator('.ticket-admin:has-text("Zalo E2E 0900")').first();
+  await Promise.all([staff2.waitForNavigation(), resetTicket.locator('button:has-text("Cấp link")').click()]);
+  const link = await staff2.inputValue('input.issued-link');
+  check(/\/reset_password\.php\?token=[a-f0-9]{48}$/.test(link), 'v23-support-issues-reset-link', link);
+  await staff2.screenshot({ path: path.join(OUT, 'v23-reset-link.png') });
+  await anon.goto(link);
+  await anon.fill('#password', 'Pinpoint@123');
+  await anon.fill('#password2', 'Pinpoint@123');
+  await Promise.all([anon.waitForNavigation(), anon.click('button[type=submit]')]);
+  check(await anon.$('[data-reset-done]') !== null, 'v23-password-reset-via-link');
+  await anon.goto(link);
+  check(await anon.$('[data-reset-invalid]') !== null, 'v23-reset-link-single-use');
+
+  // Quản trị hệ thống: thống kê, khoá tài khoản → người bị khoá mất phiên ngay → mở khoá
+  const adm = await login('admin@pinpoint.test');
+  await adm.goto(`${BASE}/admin.php`);
+  check((await adm.$$('.stat')).length === 8 && await adm.$('svg.bar-chart rect') !== null, 'v23-admin-overview');
+  await adm.screenshot({ path: path.join(OUT, 'v23-admin.png') });
+  await adm.goto(`${BASE}/admin.php?tab=users`);
+  const vrow = adm.locator('tr[data-user="viewer@pinpoint.test"]');
+  await vrow.locator('summary').click();
+  await vrow.locator('input[name=reason]').fill('E2E: thử khoá');
+  await Promise.all([adm.waitForNavigation(), vrow.locator('button:has-text("Khoá tài khoản")').click()]);
+  check(await adm.$('tr.is-locked[data-user="viewer@pinpoint.test"]') !== null, 'v23-admin-locks-user');
+  await viewer.goto(`${BASE}/projects.php`);
+  check(viewer.url().includes('/login.php'), 'v23-locked-user-logged-out', viewer.url());
+  await viewer.fill('#email', 'viewer@pinpoint.test');
+  await viewer.fill('#password', 'Pinpoint@123');
+  await Promise.all([viewer.waitForNavigation(), viewer.click('button[type=submit]')]);
+  check((await viewer.textContent('.flash.error')).includes('bị khoá'), 'v23-locked-login-message');
+  await adm.screenshot({ path: path.join(OUT, 'v23-admin-users.png') });
+  await vrow.locator('summary').click();
+  await Promise.all([adm.waitForNavigation(), vrow.locator('button:has-text("Mở khoá")').click()]);
+  check(await adm.$('tr.is-locked[data-user="viewer@pinpoint.test"]') === null, 'v23-admin-unlocks-user');
+  await adm.goto(`${BASE}/admin.php?tab=projects`);
+  check((await adm.$$('#admin-projects tbody tr')).length >= 2, 'v23-admin-sees-all-projects');
+  await anonCtx.close();
 
   // Lọc trạng thái phía trình duyệt + giao diện tối
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);

@@ -27,8 +27,14 @@ Người tạo dự án luôn giữ quyền ADMIN. Quyền được kiểm tra �
 | StatusHistory | `status_history` | from → to, người đổi, `checked_version_id` = phiên bản dùng để kiểm tra, ghi chú |
 | (thuộc tính, bản 2.0) | cột mới của `annotations` | `priority ∈ {LOW, MEDIUM, HIGH, URGENT}`, `category ∈ {LAYOUT, COLOR, TYPO, CONTENT, UX, A11Y, OTHER}`, `assignee_id` → users (phải là thành viên dự án), `due_date`, **`note`** (ghi chú xử lý ≤ 4000 ký tự) + `note_updated_by/at` |
 | Reaction (bản 2.0) | `comment_reactions` | cảm xúc trên nhận xét/trả lời; khoá chính (comment_id, user_id, kind), `kind ∈ {LIKE, HEART, PARTY, EYES}` |
-| Notification (bản 2.1) | `notifications` | người nhận, người thực hiện, `kind ∈ {MENTION, ASSIGNED, REPLY, STATUS}`, góp ý liên quan, trích nội dung, `read_at` |
-| SupportTicket (bản 2.1) | `support_tickets` | yêu cầu hỗ trợ: loại, tiêu đề, nội dung, `status ∈ {OPEN, ANSWERED, CLOSED}`, trả lời |
+| Notification (bản 2.1, 2.2) | `notifications` | người nhận, người thực hiện, `kind ∈ {MENTION, ASSIGNED, REPLY, STATUS, INVITE, INVITE_REPLY, TICKET, TICKET_REPLY}`, góp ý / dự án / yêu cầu liên quan, trích nội dung, `read_at` |
+| SupportTicket (bản 2.1, 2.2) | `support_tickets` | yêu cầu hỗ trợ: loại, tiêu đề, nội dung, `status ∈ {OPEN, ANSWERED, CLOSED}`, trả lời, `handled_by` (nhân viên hỗ trợ trả lời) |
+| ProjectInvitation (bản 2.2) | `project_invitations` | lời mời: dự án, người được mời, quyền, người mời, lời nhắn, `status ∈ {PENDING, ACCEPTED, DECLINED, CANCELLED}`; tối đa một lời mời PENDING cho mỗi (dự án, người) |
+| CommentAttachment (bản 2.3) | `comment_attachments` | ảnh đính kèm của một nhận xét: tên lưu ngẫu nhiên, tên gốc, loại PNG/JPEG, kích thước, người tải; tối đa 4 ảnh / nhận xét |
+| PasswordReset (bản 2.3) | `password_resets` | mã đặt lại mật khẩu: chỉ lưu `token_hash` (SHA-256), người cấp, `expires_at` (+30 phút), `used_at` (dùng một lần) |
+| AdminLog (bản 2.3) | `admin_log` | nhật ký quản trị: ai, thao tác (LOCK, UNLOCK, GRANT_ADMIN, RESET_LINK, JOIN_PROJECT, DELETE_PROJECT…), đối tượng, chi tiết |
+| (thuộc tính 2.3) | `annotations.points`, `users.is_admin`, `users.locked_at`, `users.last_login_at`, `support_tickets.is_password_reset` | nét mũi tên/vẽ tay (jsonb `[[x,y],…]` theo pixel ảnh gốc, CHECK theo kiểu dấu); quản trị viên; khoá tài khoản; yêu cầu “Quên mật khẩu” |
+| (thuộc tính) | `users.is_support` | tài khoản thuộc bộ phận hỗ trợ: thấy và trả lời mọi yêu cầu hỗ trợ, không cần thuộc dự án nào |
 | ActivityEvent (bản 2.0) | `annotation_events` | nhật ký mọi thay đổi: `kind ∈ {CREATED, REPLIED, EDITED, STATUS, PRIORITY, CATEGORY, ASSIGNEE, DUE, NOTE}`, giá trị cũ/mới, chi tiết, người làm, thời điểm |
 
 Quan hệ 1–1 theo nghiệp vụ: mỗi Annotation có đúng một nhận xét gốc. Mỗi Screen có một phiên bản mới nhất, là phiên bản có `version_no` lớn nhất.
@@ -130,16 +136,23 @@ flowchart LR
 | `/help.php` (GET/POST) | đăng nhập | Hỗ trợ khách hàng: trợ lý ảo, câu hỏi thường gặp, gửi/đóng yêu cầu của mình |
 | `/delete.php` (POST) | ADMIN (dự án: chỉ người tạo + gõ lại tên) | Xoá phiên bản ảnh tải nhầm, xoá màn hình, xoá dự án |
 | `/inbox.php` | đăng nhập | Việc của tôi: góp ý chưa xử lý được giao cho tôi, nhóm theo quá hạn / sắp đến hạn |
-| `/members.php` (POST) | ADMIN | Thêm / đổi quyền / xoá thành viên |
+| `/members.php` (POST) | ADMIN | Gửi lời mời (người nhận phải chấp nhận) / huỷ lời mời / đổi quyền / xoá thành viên |
+| `/invitation.php` (POST) | người được mời | Chấp nhận (trở thành thành viên với quyền ghi trong lời mời) hoặc từ chối lời mời |
+| `/support_admin.php` (GET/POST) | `users.is_support` hoặc `is_admin` | Bộ phận hỗ trợ: xem mọi yêu cầu, lọc theo trạng thái, trả lời, đổi trạng thái; cấp link đặt lại mật khẩu cho yêu cầu “Quên mật khẩu” |
+| `/admin.php?tab=overview\|users\|projects` (GET/POST) | `users.is_admin` | Quản trị hệ thống: thống kê, biểu đồ 14 ngày, khoá/mở khoá, cấp quyền, cấp link đặt lại mật khẩu, mở/xoá mọi dự án, nhật ký quản trị |
+| `/forgot.php` (GET/POST) | — | Quên mật khẩu: gửi thư (nếu có `PINPOINT_MAIL_FROM`) hoặc tạo yêu cầu hỗ trợ; trả lời như nhau với mọi email; tối đa 5 lần / 10 phút |
+| `/reset_password.php?token=` (GET/POST) | người có link | Đặt mật khẩu mới; mã dùng một lần, hết hạn sau 30 phút; `Referrer-Policy: no-referrer` |
+| `/attachment.php?id=` (GET), `/attachment.php` (POST multipart) | VIEW / COMMENT + tác giả | Phát ảnh đính kèm sau khi kiểm tra quyền; đính kèm ảnh vào nhận xét của chính mình |
+| `/api.php?action=notif_poll&after=` (GET) | đăng nhập | Số chưa đọc + thông báo mới hơn `after` (chuông tự cập nhật mỗi 8 giây) |
 | `/screen_new.php`, `/version_new.php` (POST) | ADMIN | Tạo màn hình kèm v1; tải phiên bản mới |
 | `/screen.php?id=&v=&a=` | VIEW | Trình xem một phiên bản (COMMENT mới có công cụ) |
-| `/compare.php?screen=&left=&right=&mode=side\|swipe\|onion` | VIEW | Hai phiên bản cạnh nhau, thanh trượt hoặc chồng mờ |
+| `/compare.php?screen=&left=&right=&mode=side\|swipe\|onion\|diff` | VIEW | Hai phiên bản cạnh nhau, thanh trượt, chồng mờ hoặc **tô đỏ chỗ khác** (so điểm ảnh trên trình duyệt) |
 | `/issues.php?project=&status=&author=&screen=&q=&priority=&category=&assignee=&overdue=&sort=` | VIEW | Tìm góp ý (nội dung + ghi chú), thống kê, nhật ký hoạt động, in/PDF |
 | `/export.php?…` | VIEW | Xuất CSV theo bộ lọc |
 | `/image.php?id=` | VIEW | Phát ảnh sau khi kiểm tra quyền |
 | `/api.php?action=list&version=` (GET) | VIEW | Danh sách góp ý của một phiên bản (JSON) |
 | `/api.php?action=activity&project=&screen=` (GET) | VIEW | Nhật ký hoạt động (40 thay đổi mới nhất) |
-| `/api.php` `create` · `reply` · `edit` · `status` (POST) | COMMENT | Tạo dấu + nhận xét (kèm ưu tiên, nhãn, người phụ trách, hạn); trả lời; sửa (`lock_version`); đổi trạng thái (`lock_version`, `checked_version_id`) |
+| `/api.php` `create` · `reply` · `edit` · `status` (POST) | COMMENT | Tạo dấu POINT / RECT / ARROW / DRAW (`points`) + nhận xét (kèm ưu tiên, nhãn, người phụ trách, hạn); trả lời; sửa (`lock_version`); đổi trạng thái (`lock_version`, `checked_version_id`) |
 | `/api.php?action=notifications` (GET), `notif_read` · `chat` (POST) | đăng nhập | Thông báo + số chưa đọc; đánh dấu đã đọc; hỏi trợ lý ảo |
 | `/api.php` `update` · `react` (POST) | COMMENT | Sửa thuộc tính/ghi chú (`lock_version`, chung khoá với trạng thái → CONFLICT kèm giá trị hiện tại); bật/tắt cảm xúc |
 | `/calibration.php` | — | Phép thử 1 trực quan |

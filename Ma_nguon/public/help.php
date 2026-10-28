@@ -44,6 +44,8 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" data-ask="So sánh hai phiên bản ra sao?">So sánh hai phiên bản</button>
 <button type="button" data-ask="Mời thành viên và cấp quyền">Mời thành viên</button>
 <button type="button" data-ask="Thông báo khi được @ nhắc tên">Thông báo khi được @</button>
+<button type="button" data-ask="Vẽ mũi tên và dán ảnh chụp">Mũi tên, ảnh chụp</button>
+<button type="button" data-ask="Quên mật khẩu thì làm sao?">Quên mật khẩu</button>
 </div>
 <form class="chat-form" id="chat-form">
 <input type="text" id="chat-input" maxlength="500" placeholder="Nhập câu hỏi về cách dùng ứng dụng…" aria-label="Câu hỏi cho trợ lý ảo" autocomplete="off">
@@ -74,7 +76,7 @@ require __DIR__ . '/../templates/header.php';
 <div class="field"><label for="tsub">Tiêu đề</label><input id="tsub" name="subject" type="text" required maxlength="150" placeholder="Ví dụ: Không tải được ảnh JPEG"></div>
 <div class="field"><label for="tmsg">Mô tả chi tiết</label><textarea id="tmsg" name="message" required maxlength="4000" placeholder="Bạn đang làm gì, thấy thông báo gì, mong muốn điều gì…"></textarea></div>
 <button class="btn btn-block" type="submit">Gửi yêu cầu</button>
-<p class="hint mt-s">Thường được trả lời trong 1 ngày làm việc. Không gửi mật khẩu trong yêu cầu.</p>
+<p class="hint mt-s"><strong>Ai xử lý?</strong> Yêu cầu được chuyển tới <strong>Bộ phận hỗ trợ Pinpoint</strong> (tài khoản có quyền hỗ trợ). Họ nhận thông báo ngay, trả lời trên trang quản lý yêu cầu; bạn nhận thông báo 🔔 và xem câu trả lời ở mục “Yêu cầu của tôi”. Không gửi mật khẩu trong yêu cầu.</p>
 </form>
 </div>
 
@@ -88,7 +90,8 @@ require __DIR__ . '/../templates/header.php';
 <span class="badge <?= $t['status'] === 'ANSWERED' ? 'badge-resolved' : ($t['status'] === 'OPEN' ? 'badge-open' : 'badge-muted') ?>"><?= e(SupportRepository::STATUSES[$t['status']]) ?></span></div>
 <div class="hint"><?= e(SupportRepository::CATEGORIES[$t['category']]) ?> · <?= e(dateVi($t['created_at'])) ?></div>
 <details><summary class="hint">Nội dung</summary><p class="pre"><?= e($t['message']) ?></p></details>
-<?php if ($t['reply'] !== ''): ?><div class="ticket-reply"><strong>Bộ phận hỗ trợ:</strong><p class="pre"><?= e($t['reply']) ?></p></div><?php endif; ?>
+<?php if ($t['reply'] !== ''): ?><div class="ticket-reply"><strong><?= e($t['handled_by_name'] ?? 'Bộ phận hỗ trợ') ?> trả lời<?= $t['updated_at'] ? ' · ' . e(ago($t['updated_at'])) : '' ?>:</strong><p class="pre"><?= e($t['reply']) ?></p></div>
+<?php elseif ($t['status'] === 'OPEN'): ?><div class="hint">Đang chờ bộ phận hỗ trợ xem. Bạn sẽ nhận thông báo ở chuông 🔔 khi có trả lời.</div><?php endif; ?>
 <?php if ($t['status'] !== 'CLOSED'): ?>
 <form method="post" action="/help.php"><?= csrfField() ?><input type="hidden" name="action" value="close"><input type="hidden" name="id" value="<?= (int) $t['id'] ?>">
 <button class="btn btn-xs btn-subtle" type="submit">Đóng yêu cầu</button></form>

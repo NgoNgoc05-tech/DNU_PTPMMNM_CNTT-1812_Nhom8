@@ -1,4 +1,4 @@
-// Chuông thông báo (tải danh sách khi mở, cập nhật số chưa đọc mỗi 60 giây) và trợ lý ảo.
+// Chuông thông báo (tải danh sách khi mở, tự cập nhật mỗi 8 giây + thẻ nổi khi có thông báo mới) và trợ lý ảo.
 // Nội dung từ máy chủ luôn gán bằng textContent.
 (function () {
   'use strict';
@@ -68,11 +68,52 @@
     document.getElementById('notif-read-all').addEventListener('click', function () {
       post(csrf, { action: 'notif_read', id: 0 }).then(load).catch(function () {});
     });
-    setInterval(function () {
-      if (document.hidden) { return; }
-      fetch('/api.php?action=notifications', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-        .then(function (r) { return r.json(); }).then(function (d) { if (typeof d.unread === 'number') { setCount(d.unread); } }).catch(function () {});
-    }, 60000);
+    // Bản 2.3: thông báo tức thời — hỏi máy chủ mỗi 8 giây khi tab đang mở (dừng khi tab ẩn, hỏi ngay khi quay lại),
+    // hiện thẻ nổi cho thông báo mới và báo cho trang đang mở (ví dụ trình xem tự tải lại góp ý).
+    var latest = Number(menu.dataset.latest || 0);
+    var polling = false;
+    var POLL_MS = Number(menu.dataset.poll || 8000);
+    var pop = function (n) {
+      var wrap = document.querySelector('.live-wrap');
+      if (!wrap) { wrap = el('div', 'live-wrap'); wrap.setAttribute('aria-live', 'polite'); document.body.appendChild(wrap); }
+      var card = el(n.link ? 'a' : 'div', 'live-card');
+      if (n.link) { card.href = n.link; }
+      card.addEventListener('click', function () { post(csrf, { action: 'notif_read', id: n.id }).catch(function () {}); });
+      var av = el('span', 'avatar avatar-sm avatar-c' + (n.actor_id % 8), initials(n.actor));
+      var t = el('span', 'live-text');
+      t.appendChild(el('strong', '', String(n.actor || 'Pinpoint').replace(/\s*\(.*?\)\s*/g, ' ').trim()));
+      t.appendChild(document.createTextNode(' ' + n.label + (n.where ? ' · ' + n.where : '')));
+      if (n.body) { t.appendChild(el('span', 'quote line-clamp-2', n.body)); }
+      var x = el('button', 'live-x', '×');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Đóng');
+      x.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); card.remove(); });
+      card.appendChild(av); card.appendChild(t); card.appendChild(x);
+      wrap.appendChild(card);
+      while (wrap.children.length > 3) { wrap.removeChild(wrap.firstChild); }
+      setTimeout(function () { card.classList.add('is-leaving'); setTimeout(function () { card.remove(); }, 400); }, 9000);
+    };
+    var poll = function () {
+      if (polling || document.hidden) { return; }
+      polling = true;
+      fetch('/api.php?action=notif_poll&after=' + latest, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (typeof d.unread !== 'number') { return; }
+          setCount(d.unread);
+          (d.items || []).slice().reverse().forEach(pop);
+          if (d.items && d.items.length) {
+            if (menu.open) { load(); }
+            window.dispatchEvent(new CustomEvent('pinpoint:notifications', { detail: d.items }));
+          }
+          latest = Math.max(latest, d.latest || 0);
+        })
+        .catch(function () {})
+        .then(function () { polling = false; });
+    };
+    setInterval(poll, POLL_MS);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { poll(); } });
+    window.pinpointPoll = poll; // dùng cho kiểm thử trên trình duyệt
   }
 
   // ------------------------------------------------------------------ trợ lý ảo

@@ -30,6 +30,7 @@ final class ScreenRepository
     public function deleteVersion(int $versionId): array
     {
         $v = $this->version($versionId);
+        $extra = AttachmentRepository::storedNames($this->c, 'version', $versionId);
         transaction($this->c, function () use ($v): void {
             fetchOne($this->c, 'SELECT id FROM screens WHERE id = $1 FOR UPDATE', [$v['screen_id']]);
             $count = (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM image_versions WHERE screen_id = $1', [$v['screen_id']])['n'];
@@ -38,7 +39,9 @@ final class ScreenRepository
             }
             queryParams($this->c, 'DELETE FROM image_versions WHERE id = $1', [$v['id']]);
         });
-        @unlink(ImageStore::path($v['stored_name']));
+        foreach (array_merge([$v['stored_name']], $extra) as $f) {
+            @unlink(ImageStore::path($f));
+        }
         return ['screen_id' => $v['screen_id'], 'version_no' => $v['version_no']];
     }
 
@@ -46,7 +49,8 @@ final class ScreenRepository
     public function deleteScreen(int $screenId): int
     {
         $screen = $this->find($screenId);
-        $files = array_column(fetchAll($this->c, 'SELECT stored_name FROM image_versions WHERE screen_id = $1', [$screenId]), 'stored_name');
+        $files = array_merge(array_column(fetchAll($this->c, 'SELECT stored_name FROM image_versions WHERE screen_id = $1', [$screenId]), 'stored_name'),
+            AttachmentRepository::storedNames($this->c, 'screen', $screenId));
         queryParams($this->c, 'DELETE FROM screens WHERE id = $1', [$screenId]);
         foreach ($files as $f) {
             @unlink(ImageStore::path($f));

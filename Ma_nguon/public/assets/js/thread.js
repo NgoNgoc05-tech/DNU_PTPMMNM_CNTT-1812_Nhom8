@@ -8,6 +8,15 @@
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICONS = {
+    'arrow-tool': '<path d="M5 19 19 5"/><path d="M9 5h10v10"/>',
+    'pen': '<path d="M3 17c2.5-.5 3.5-6 6.5-6s3 5.5 6 5.5S20 13 21 10"/>',
+    'paperclip': '<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/>',
+    'shield': '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>',
+    'lock': '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    'unlock': '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
+    'key': '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l3 3M15 8l2 2"/>',
+    'diff': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h3M8 12h8M13 16h3"/><circle cx="16" cy="8" r="1.5"/>',
+    'chart': '<path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/>',
     check: '<path d="M20 6 9 17l-5-5"/>', undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
     left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
     chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/>', note: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
@@ -60,6 +69,14 @@
     return fetch('/api.php?action=activity&project=' + encodeURIComponent(projectId) + '&screen=' + encodeURIComponent(screenId || 0),
       { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then(parse);
   };
+  /** Bản 2.3: đính kèm một ảnh (PNG/JPEG ≤ 5 MB) vào nhận xét của chính mình. */
+  Api.prototype.upload = function (commentId, file) {
+    var fd = new FormData();
+    fd.append('csrf', this.csrf);
+    fd.append('comment_id', String(commentId));
+    fd.append('image', file, file.name || 'anh-chup.png');
+    return fetch('/attachment.php', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: fd }).then(parse);
+  };
   Api.prototype.post = function (payload) {
     return fetch('/api.php', {
       method: 'POST', credentials: 'same-origin',
@@ -98,12 +115,15 @@
     if (s < 604800) { return Math.floor(s / 86400) + ' ngày trước'; }
     return fmt(ts).slice(0, 5);
   }
-  function dmy(date) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
   function num(v) { return (Math.round(v * 100) / 100).toString(); }
+  var SHAPE_ICON = { POINT: 'pin', RECT: 'square', ARROW: 'arrow-tool', DRAW: 'pen' };
+  var SHAPE_LABEL = { POINT: 'Điểm', RECT: 'Vùng chữ nhật', ARROW: 'Mũi tên', DRAW: 'Nét vẽ tay' };
   function position(a) {
-    return a.shape === 'POINT'
-      ? 'Điểm (' + num(a.x) + '; ' + num(a.y) + ') px ảnh gốc'
-      : 'Vùng (' + num(a.x) + '; ' + num(a.y) + ') ' + num(a.w) + '×' + num(a.h) + ' px';
+    if (a.shape === 'POINT') { return 'Điểm (' + num(a.x) + '; ' + num(a.y) + ') px ảnh gốc'; }
+    if (a.shape === 'RECT') { return 'Vùng (' + num(a.x) + '; ' + num(a.y) + ') ' + num(a.w) + '×' + num(a.h) + ' px'; }
+    var p = a.points || [];
+    if (a.shape === 'ARROW' && p.length === 2) { return 'Mũi tên (' + num(p[0][0]) + '; ' + num(p[0][1]) + ') → (' + num(p[1][0]) + '; ' + num(p[1][1]) + ') px'; }
+    return 'Nét vẽ ' + p.length + ' điểm, bắt đầu (' + num(a.x) + '; ' + num(a.y) + ') px';
   }
   function cleanName(n) { return String(n || '').replace(/\s*\(.*?\)\s*/g, ' ').trim(); }
   function initials(n) {
@@ -126,7 +146,7 @@
   function cat(c) { return el('span', { class: 'cat cat-' + c, text: CATEGORY[c] || c }); }
   function due(a) {
     if (!a.due_date) { return null; }
-    var s = el('span', { class: 'due' + (a.overdue ? ' is-overdue' : '') }, [icon('calendar'), dmy(a.due_date).slice(0, 5) + (a.overdue ? ' · quá hạn' : '')]);
+    var s = el('span', { class: 'due' + (a.overdue ? ' is-overdue' : '') }, [icon('calendar'), mdy(a.due_date).slice(0, 5) + (a.overdue ? ' · quá hạn' : '')]);
     return s;
   }
   function options(select, map, current) {
@@ -135,34 +155,115 @@
   }
 
   /**
-   * Ô ngày hiển thị theo kiểu Việt Nam ngày/tháng/năm (dd/mm/yyyy) — không phụ thuộc ngôn ngữ trình duyệt.
-   * Gõ trực tiếp hoặc bấm biểu tượng lịch để chọn. getIso() trả về yyyy-mm-dd cho máy chủ ('' = không đặt).
+   * Ô hạn xử lý theo dạng tháng/ngày/năm (mm/dd/yyyy) — không phụ thuộc ngôn ngữ trình duyệt.
+   * Gõ trực tiếp hoặc bấm biểu tượng lịch để mở lịch tiếng Việt của ứng dụng (không dùng lịch gốc tiếng Anh).
+   * getIso() trả về yyyy-mm-dd cho máy chủ ('' = không đặt).
    */
+  var WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  var openCal = null;
+  function closeCalendar() { if (openCal) { openCal.close(); } }
+  document.addEventListener('mousedown', function (e) {
+    if (openCal && !openCal.pop.contains(e.target) && !openCal.owner.contains(e.target)) { closeCalendar(); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openCal) { var o = openCal.owner; closeCalendar(); o.input.focus(); } }, true);
+  window.addEventListener('resize', closeCalendar);
+  document.addEventListener('scroll', function (e) { if (openCal && !openCal.pop.contains(e.target)) { closeCalendar(); } }, true);
+
+  function isoOf(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+  function todayIso() { var t = new Date(); return isoOf(t.getFullYear(), t.getMonth(), t.getDate()); }
+
+  function calendar(owner, selectedIso, onPick) {
+    var pop = el('div', { class: 'cal-pop', role: 'dialog', 'aria-label': 'Chọn hạn xử lý' });
+    var base = /^(\d{4})-(\d{2})/.exec(selectedIso || '') || /^(\d{4})-(\d{2})/.exec(todayIso());
+    var view = { y: +base[1], m: +base[2] - 1 };
+    var title = el('strong', { class: 'cal-title', 'aria-live': 'polite' });
+    var prev = el('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Tháng trước', text: '‹' });
+    var next = el('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Tháng sau', text: '›' });
+    var grid = el('div', { class: 'cal-grid', role: 'grid' });
+    var todayBtn = el('button', { type: 'button', class: 'btn btn-xs btn-subtle', text: 'Hôm nay' });
+    var clearBtn = el('button', { type: 'button', class: 'btn btn-xs btn-subtle', text: 'Xoá hạn' });
+    pop.appendChild(el('div', { class: 'cal-head' }, [prev, title, next]));
+    pop.appendChild(grid);
+    pop.appendChild(el('div', { class: 'cal-foot' }, [clearBtn, todayBtn]));
+    function render(focusIso) {
+      title.textContent = 'Tháng ' + (view.m + 1) + ', ' + view.y;
+      grid.textContent = '';
+      WEEKDAYS.forEach(function (w) { grid.appendChild(el('span', { class: 'cal-wd' + (w === 'CN' ? ' is-sun' : ''), text: w })); });
+      var first = new Date(view.y, view.m, 1);
+      var lead = (first.getDay() + 6) % 7; // thứ Hai là cột đầu
+      var days = new Date(view.y, view.m + 1, 0).getDate();
+      for (var i = 0; i < lead; i++) { grid.appendChild(el('span', { class: 'cal-empty' })); }
+      var today = todayIso();
+      for (var d = 1; d <= days; d++) {
+        var iso = isoOf(view.y, view.m, d);
+        var b = el('button', { type: 'button', class: 'cal-day' + (iso === today ? ' is-today' : '') + (iso === selectedIso ? ' is-selected' : '')
+          + ((lead + d - 1) % 7 === 6 ? ' is-sun' : ''), 'data-iso': iso, text: String(d),
+          'aria-label': 'Ngày ' + d + ' tháng ' + (view.m + 1) + ' năm ' + view.y, 'aria-pressed': iso === selectedIso ? 'true' : 'false' });
+        grid.appendChild(b);
+      }
+      var f = focusIso && grid.querySelector('[data-iso="' + focusIso + '"]');
+      if (f) { f.focus(); }
+    }
+    function shift(n) { view.m += n; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } render(); }
+    prev.addEventListener('click', function () { shift(-1); });
+    next.addEventListener('click', function () { shift(1); });
+    grid.addEventListener('click', function (e) { var b = e.target.closest('.cal-day'); if (b) { onPick(b.getAttribute('data-iso')); api.close(); owner.input.focus(); } });
+    grid.addEventListener('keydown', function (e) {
+      var b = e.target.closest('.cal-day'); if (!b) { return; }
+      var step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+      if (!step) { return; }
+      e.preventDefault();
+      var p = b.getAttribute('data-iso').split('-');
+      var dt = new Date(+p[0], +p[1] - 1, +p[2] + step);
+      view.y = dt.getFullYear(); view.m = dt.getMonth();
+      render(isoOf(view.y, view.m, dt.getDate()));
+    });
+    todayBtn.addEventListener('click', function () { onPick(todayIso()); api.close(); owner.input.focus(); });
+    clearBtn.addEventListener('click', function () { onPick(''); api.close(); owner.input.focus(); });
+    var api = {
+      pop: pop, owner: owner,
+      close: function () { if (pop.parentNode) { pop.parentNode.removeChild(pop); } if (openCal === api) { openCal = null; } owner.btn.setAttribute('aria-expanded', 'false'); }
+    };
+    render();
+    document.body.appendChild(pop);
+    // Đặt lịch ngay dưới ô (hoặc phía trên nếu thiếu chỗ); dùng position: fixed để không bị khung cuộn cắt mất.
+    var r = owner.getBoundingClientRect();
+    var h = pop.offsetHeight, w = pop.offsetWidth;
+    var top = r.bottom + 6 + h > window.innerHeight ? Math.max(8, r.top - 6 - h) : r.bottom + 6;
+    pop.style.top = top + 'px';
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    owner.btn.setAttribute('aria-expanded', 'true');
+    var sel = grid.querySelector('.is-selected') || grid.querySelector('.is-today') || grid.querySelector('.cal-day');
+    if (sel) { sel.focus(); }
+    openCal = api;
+    return api;
+  }
+
+  function mdy(date) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || ''); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; }
+
   function dateField(iso, label, onChange) {
     var wrap = el('span', { class: 'date-field' });
-    var text = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'ngày/tháng/năm', maxlength: '10', 'aria-label': label,
-      autocomplete: 'off', value: dmy(iso) });
-    var picker = el('input', { type: 'date', tabindex: '-1', 'aria-hidden': 'true', class: 'date-native', value: iso || '' });
-    var btn = el('button', { type: 'button', class: 'date-btn', title: 'Chọn ngày trên lịch', 'aria-label': 'Chọn ngày trên lịch' }, [icon('calendar')]);
+    var text = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'tháng/ngày/năm', maxlength: '10', 'aria-label': label + ' (tháng/ngày/năm)',
+      autocomplete: 'off', value: mdy(iso) });
+    var btn = el('button', { type: 'button', class: 'date-btn', title: 'Chọn ngày trên lịch', 'aria-label': 'Chọn ngày trên lịch', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' }, [icon('calendar')]);
     var current = iso || '';
     function parse(v) {
       v = v.trim();
       if (v === '') { return ''; }
       var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(v);
       if (!m) { return null; }
-      var d = +m[1], mo = +m[2], y = +m[3];
+      var mo = +m[1], d = +m[2], y = +m[3];
       var dt = new Date(Date.UTC(y, mo - 1, d));
       if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) { return null; }
-      return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      return isoOf(y, mo - 1, d);
     }
     function commit(newIso) {
       text.classList.remove('is-invalid');
-      text.value = dmy(newIso);
-      picker.value = newIso;
+      text.value = mdy(newIso);
       if (newIso !== current) { current = newIso; if (onChange) { onChange(newIso); } }
     }
     text.addEventListener('input', function () {
-      // tự thêm dấu "/" khi gõ số: 2110 -> 21/10
+      // tự thêm dấu "/" khi gõ số: 1025 -> 10/25
       var digits = text.value.replace(/[^0-9]/g, '').slice(0, 8);
       if (/^[0-9\/]*$/.test(text.value)) {
         text.value = digits.length > 4 ? digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4)
@@ -171,21 +272,25 @@
     });
     text.addEventListener('change', function () {
       var v = parse(text.value);
-      if (v === null) { text.classList.add('is-invalid'); toast('Ngày không hợp lệ. Nhập theo dạng ngày/tháng/năm, ví dụ 25/10/2026.', true); return; }
+      if (v === null) { text.classList.add('is-invalid'); toast('Ngày không hợp lệ. Nhập theo dạng tháng/ngày/năm, ví dụ 10/25/2026 (25 tháng 10).', true); return; }
       commit(v);
     });
-    text.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); text.dispatchEvent(new Event('change')); } });
-    picker.addEventListener('change', function () { commit(picker.value); });
+    text.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); text.dispatchEvent(new Event('change')); }
+      if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); btn.click(); }
+    });
     btn.addEventListener('click', function () {
-      if (picker.showPicker) { try { picker.showPicker(); return; } catch (e) { /* trình duyệt cũ */ } }
-      picker.focus();
-      picker.click();
+      var mine = openCal && openCal.owner === wrap;
+      closeCalendar();
+      if (mine) { return; }
+      var v = parse(text.value);
+      calendar(wrap, v === null ? current : v, commit);
     });
     wrap.appendChild(text);
     wrap.appendChild(btn);
-    wrap.appendChild(picker);
     wrap.getIso = function () { var v = parse(text.value); return v === null ? '' : v; };
     wrap.input = text;
+    wrap.btn = btn;
     return wrap;
   }
 
@@ -330,7 +435,7 @@
       if (a.assignee) { tags.appendChild(el('span', { class: 'mini', title: 'Phụ trách: ' + a.assignee }, [avatar(a.assignee, a.assignee_id, 'sm')])); }
       if (a.note) { tags.appendChild(el('span', { class: 'mini', title: 'Có ghi chú xử lý' }, [icon('note')])); }
       if (a.reply_count) { tags.appendChild(el('span', { class: 'mini', title: a.reply_count + ' trả lời' }, [icon('chat'), String(a.reply_count)])); }
-      if (a.shape === 'RECT') { tags.appendChild(el('span', { class: 'mini', title: 'Vùng chữ nhật' }, [icon('square')])); }
+      if (a.shape !== 'POINT') { tags.appendChild(el('span', { class: 'mini', title: SHAPE_LABEL[a.shape] }, [icon(SHAPE_ICON[a.shape])])); }
       var li = el('li', { 'data-id': a.id, class: (a.id === self.selectedId ? 'is-selected ' : '') + (a.status === 'RESOLVED' ? 'is-resolved' : '') }, [
         el('button', { type: 'button', onclick: function () { self.opt.onSelect(a.id); },
           onmouseenter: function () { if (self.opt.onHover) { self.opt.onHover(a.id); } },
@@ -366,7 +471,7 @@
       e.preventDefault();
       if (!comp.area.value.trim()) { comp.area.focus(); return; }
       send.disabled = true;
-      self.opt.api.post({ action: 'create', version_id: cfg.versionId, shape: d.shape, x: d.x, y: d.y, w: d.w, h: d.h, body: comp.area.value,
+      self.opt.api.post({ action: 'create', version_id: cfg.versionId, shape: d.shape, x: d.x, y: d.y, w: d.w, h: d.h, points: d.points || undefined, body: comp.area.value,
         priority: pSel.value, category: cSel.value, assignee_id: Number(aSel.value), due_date: dIn.getIso() })
         .then(function (res) { toast('Đã lưu góp ý #' + res.item.seq_no); onDone(); self.opt.onChanged(res.item.id); })
         .catch(function (err) { send.disabled = false; toast(err.message, true); });
@@ -402,7 +507,7 @@
 
     // Nhận xét gốc
     var rootBox = this.renderComment({ id: a.comment_id, body: a.body, author: a.author, author_id: a.comment_author_id,
-      lock_version: a.comment_lock, created_at: a.created_at, edited: a.comment_revisions > 0, reactions: a.reactions }, false);
+      lock_version: a.comment_lock, created_at: a.created_at, edited: a.comment_revisions > 0, reactions: a.reactions, attachments: a.attachments }, false);
     wrap.appendChild(rootBox);
 
     // Trạng thái (ghi nhận phiên bản đã kiểm tra)
@@ -448,15 +553,27 @@
     }
     if (cfg.canComment) {
       var btn = el('button', { class: 'btn btn-sm', type: 'submit' }, [icon('send'), 'Gửi trả lời']);
-      var rc = composer({ label: 'Trả lời', placeholder: 'Trả lời nhận xét này… (gõ @ để nhắc tên)', members: cfg.members, onSubmit: function () { replyForm.requestSubmit(); } });
+      var rc = composer({ label: 'Trả lời', placeholder: 'Trả lời nhận xét này… (gõ @ để nhắc tên, Ctrl+V để dán ảnh chụp)', members: cfg.members, onSubmit: function () { replyForm.requestSubmit(); } });
+      var files = attachPicker(rc.area);
       var replyForm = el('form', { class: 'composer', onsubmit: function (e) {
         e.preventDefault();
-        if (!rc.area.value.trim()) { return; }
+        var picked = files.list();
+        if (!rc.area.value.trim() && !picked.length) { return; }
         btn.disabled = true;
-        self.opt.api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value })
-          .then(function () { toast('Đã gửi trả lời'); self.opt.onChanged(a.id); })
+        var api = self.opt.api;
+        api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value.trim() || '📎 Ảnh đính kèm' })
+          .then(function (res) {
+            // Tải lần lượt từng ảnh; ảnh lỗi không làm mất trả lời đã gửi.
+            var failed = 0;
+            return picked.reduce(function (p, f) {
+              return p.then(function () { return api.upload(res.id, f).catch(function (err) { failed += 1; toast(err.message, true); }); });
+            }, Promise.resolve()).then(function () {
+              toast(picked.length ? 'Đã gửi trả lời kèm ' + (picked.length - failed) + ' ảnh' : 'Đã gửi trả lời');
+              self.opt.onChanged(a.id);
+            });
+          })
           .catch(function (err) { btn.disabled = false; toast(err.message, true); });
-      } }, [rc.menu, rc.area, el('div', { class: 'composer-foot' }, [el('span', { class: 'hint', text: 'Ctrl+Enter để gửi' }), btn])]);
+      } }, [rc.menu, rc.area, files.strip, el('div', { class: 'composer-foot' }, [files.button, files.input, el('span', { class: 'hint', text: 'Ctrl+Enter để gửi' }), btn])]);
       wrap.appendChild(replyForm);
     }
 
@@ -502,7 +619,7 @@
       row('user', 'Phụ trách', a.assignee ? el('span', { class: 'row center' }, [avatar(a.assignee, a.assignee_id, 'sm'), cleanName(a.assignee)]) : el('span', { class: 'faint', text: 'Chưa giao' }));
       row('calendar', 'Hạn xử lý', a.due_date ? due(a) : el('span', { class: 'faint', text: 'Không đặt' }));
     }
-    row(a.shape === 'POINT' ? 'pin' : 'square', 'Vị trí', el('span', { class: 'pos coord', text: position(a) + ' · ảnh ' + a.image_width + '×' + a.image_height }));
+    row(SHAPE_ICON[a.shape] || 'pin', 'Vị trí', el('span', { class: 'pos coord', text: position(a) + ' · ảnh ' + a.image_width + '×' + a.image_height }));
     row('layers', 'Phiên bản', el('span', { text: 'v' + a.version_no + (a.version_no < a.latest_version_no ? ' (bản mới nhất: v' + a.latest_version_no + ')' : ' (mới nhất)') }));
     row('clock', 'Tạo lúc', el('span', { text: fmt(a.created_at) + ' · ' + ago(a.created_at) }));
     return dl;
@@ -628,6 +745,12 @@
       el('time', { title: fmt(c.created_at), text: fmt(c.created_at) + ' · ' + ago(c.created_at) }),
       c.edited ? el('span', { class: 'edited', text: 'đã sửa' }) : null]));
     main.appendChild(bodyEl);
+    if (c.attachments && c.attachments.length) {
+      main.appendChild(el('div', { class: 'c-attachments' }, c.attachments.map(function (f) {
+        return el('a', { href: f.url, target: '_blank', rel: 'noopener', class: 'c-attach', title: f.name + ' · ' + f.width + '×' + f.height + ' px · bấm để xem cỡ thật' },
+          [el('img', { src: f.url, alt: 'Ảnh đính kèm: ' + f.name, loading: 'lazy' })]);
+      })));
+    }
     var actions = this.renderReactions(c);
     main.appendChild(actions);
     box.appendChild(avatar(c.author, c.author_id, isReply ? 'sm' : null));
@@ -666,6 +789,49 @@
     }
     return box;
   };
+
+  /**
+   * Chọn ảnh đính kèm cho ô trả lời (bản 2.3): nút 📎, kéo thả hoặc dán ảnh chụp màn hình (Ctrl+V).
+   * Ảnh xem trước đọc bằng FileReader (data:), hợp với CSP img-src 'self' data:.
+   */
+  var ATTACH_MAX = 4;
+  var ATTACH_BYTES = 5 * 1024 * 1024;
+  function attachPicker(area) {
+    var picked = [];
+    var strip = el('div', { class: 'attach-strip', hidden: 'hidden' });
+    var input = el('input', { type: 'file', accept: 'image/png,image/jpeg', multiple: 'multiple', hidden: 'hidden', 'aria-label': 'Chọn ảnh đính kèm' });
+    var button = el('button', { type: 'button', class: 'btn btn-xs btn-subtle attach-btn', title: 'Đính kèm ảnh (PNG/JPEG ≤ 5 MB, tối đa 4 ảnh). Có thể dán ảnh chụp bằng Ctrl+V.',
+      'aria-label': 'Đính kèm ảnh', onclick: function () { input.click(); } }, [icon('paperclip'), 'Ảnh']);
+    function draw() {
+      strip.textContent = '';
+      strip.hidden = !picked.length;
+      picked.forEach(function (f, i) {
+        var img = el('img', { alt: f.name });
+        var r = new FileReader();
+        r.onload = function () { img.src = r.result; };
+        r.readAsDataURL(f);
+        strip.appendChild(el('span', { class: 'attach-chip', title: f.name }, [img,
+          el('button', { type: 'button', class: 'attach-x', 'aria-label': 'Bỏ ảnh ' + f.name, text: '×', onclick: function () { picked.splice(i, 1); draw(); } })]));
+      });
+    }
+    function add(list) {
+      Array.prototype.forEach.call(list, function (f) {
+        if (!/^image\/(png|jpeg)$/.test(f.type)) { toast('Chỉ đính kèm ảnh PNG hoặc JPEG.', true); return; }
+        if (f.size > ATTACH_BYTES) { toast('Ảnh vượt quá 5 MB.', true); return; }
+        if (picked.length >= ATTACH_MAX) { toast('Tối đa 4 ảnh cho một trả lời.', true); return; }
+        picked.push(f.name ? f : new File([f], 'anh-chup.png', { type: f.type }));
+      });
+      draw();
+    }
+    input.addEventListener('change', function () { add(input.files); input.value = ''; });
+    area.addEventListener('paste', function (e) {
+      var items = (e.clipboardData && e.clipboardData.files) || [];
+      if (items.length) { e.preventDefault(); add(items); toast('Đã thêm ảnh chụp'); }
+    });
+    area.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1) { e.preventDefault(); } });
+    area.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); add(e.dataTransfer.files); } });
+    return { strip: strip, input: input, button: button, list: function () { return picked.slice(); } };
+  }
 
   /** Nội dung thẻ xem nhanh khi rê chuột lên dấu. */
   function hoverCard(a, card) {

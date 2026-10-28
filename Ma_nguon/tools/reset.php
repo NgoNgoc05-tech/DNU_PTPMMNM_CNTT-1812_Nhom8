@@ -17,7 +17,7 @@ if ($answer !== 'XOA') {
     echo "Đã huỷ.\n";
     exit(1);
 }
-pg_query($c, 'DROP TABLE IF EXISTS notifications, support_tickets, annotation_events, comment_reactions, status_history, comment_revisions, comments, annotations, image_versions, screens, project_members, projects, users CASCADE');
+pg_query($c, 'DROP TABLE IF EXISTS admin_log, password_resets, comment_attachments, project_invitations, notifications, support_tickets, annotation_events, comment_reactions, status_history, comment_revisions, comments, annotations, image_versions, screens, project_members, projects, users CASCADE');
 foreach (glob(ImageStore::directory() . '/*.{png,jpg}', GLOB_BRACE) ?: [] as $file) {
     unlink($file);
 }

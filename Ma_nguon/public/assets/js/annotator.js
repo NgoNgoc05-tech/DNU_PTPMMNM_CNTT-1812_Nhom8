@@ -13,6 +13,39 @@
   var C = root.PinCoords;
   var MIN_ZOOM = 0.25;
   var MAX_ZOOM = 8;
+  var SVG = 'http://www.w3.org/2000/svg';
+  var MIN_STROKE = 8;        // px ảnh gốc, giống Coordinates::MIN_STROKE ở máy chủ
+  var MAX_DRAW_POINTS = 500; // giống Coordinates::MAX_DRAW_POINTS
+
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(SVG, tag);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+  function clampPt(p, w, h) { return [Math.round(Math.min(w, Math.max(0, p.x)) * 10) / 10, Math.round(Math.min(h, Math.max(0, p.y)) * 10) / 10]; }
+  function pathLength(pts) {
+    var len = 0;
+    for (var i = 1; i < pts.length; i++) { len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); }
+    return len;
+  }
+  /** Rút gọn nét vẽ (Ramer–Douglas–Peucker) để không vượt quá MAX_DRAW_POINTS điểm. */
+  function simplify(pts, eps) {
+    if (pts.length < 3) { return pts; }
+    var a = pts[0], b = pts[pts.length - 1], best = 0, idx = 0;
+    var dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    for (var i = 1; i < pts.length - 1; i++) {
+      var d = Math.abs(dy * pts[i][0] - dx * pts[i][1] + b[0] * a[1] - b[1] * a[0]) / L;
+      if (d > best) { best = d; idx = i; }
+    }
+    if (best <= eps) { return [a, b]; }
+    return simplify(pts.slice(0, idx + 1), eps).slice(0, -1).concat(simplify(pts.slice(idx), eps));
+  }
+  function bbox(a) {
+    if (!a.points || !a.points.length) { return { x: a.x, y: a.y, w: a.w || 0, h: a.h || 0 }; }
+    var xs = a.points.map(function (p) { return p[0]; }), ys = a.points.map(function (p) { return p[1]; });
+    var x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
+    return { x: x, y: y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y };
+  }
 
   function Annotator(box, options) {
     this.box = box;
@@ -112,12 +145,24 @@
   Annotator.prototype.centerOn = function (id) {
     var a = this.find(id);
     if (!a) { this.render(); return; }
-    var cx = a.x + (a.w || 0) / 2;
-    var cy = a.y + (a.h || 0) / 2;
+    var bb = bbox(a);
+    var cx = bb.x + bb.w / 2;
+    var cy = bb.y + bb.h / 2;
     var base = C.fitContain(this.box.clientWidth, this.box.clientHeight, this.imageW, this.imageH, this.state.zoom, 0, 0);
     this.state.panX = this.box.clientWidth / 2 - (base.left + cx * base.scale);
     this.state.panY = this.box.clientHeight / 2 - (base.top + cy * base.scale);
     if (this.state.zoom <= 1) { this.state.panX = 0; this.state.panY = 0; }
+    this.layout();
+  };
+
+  /** Phóng to và đưa một vùng (pixel ảnh gốc) vào giữa khung — dùng cho danh sách vùng thay đổi (bản 2.3). */
+  Annotator.prototype.focusRect = function (x, y, w, h) {
+    var bw = this.box.clientWidth, bh = this.box.clientHeight;
+    var s0 = C.fitContain(bw, bh, this.imageW, this.imageH, 1, 0, 0).scale;
+    var zoom = Math.min(MAX_ZOOM, Math.max(1, Math.min(bw * 0.5 / (Math.max(w, 1) * s0), bh * 0.5 / (Math.max(h, 1) * s0))));
+    var base = C.fitContain(bw, bh, this.imageW, this.imageH, zoom, 0, 0);
+    this.state = { zoom: zoom, panX: bw / 2 - (base.left + (x + w / 2) * base.scale), panY: bh / 2 - (base.top + (y + h / 2) * base.scale) };
+    if (zoom <= 1) { this.state.panX = 0; this.state.panY = 0; }
     this.layout();
   };
 
@@ -133,10 +178,16 @@
     var self = this;
     var list = this.items.slice();
     if (this.draft) { list.push(this.draft); }
+    var svg = svgEl('svg', { class: 'annotator-svg', width: this.box.clientWidth, height: this.box.clientHeight, 'aria-hidden': 'true' });
+    layer.appendChild(svg);
+    this.svgDefs(svg);
     list.forEach(function (a) {
       var p = C.toScreen(a.x, a.y, c);
       var cls = (a.status === 'RESOLVED' ? ' is-resolved' : '') + (a.id === self.selectedId ? ' is-selected' : '') +
         (a.draft ? ' is-draft' : '') + (a.priority ? ' prio-' + a.priority : '') + (a.id && a.id === self.hoverId ? ' is-hover' : '');
+      if ((a.shape === 'ARROW' || a.shape === 'DRAW') && a.points) {
+        self.drawStroke(svg, a.shape, a.points, c, 'mark-stroke' + cls, a.draft ? null : a.id);
+      }
       if (a.shape === 'RECT') {
         var r = document.createElement('div');
         r.className = 'mark-rect' + cls;
@@ -149,7 +200,7 @@
       }
       var pin = document.createElement('button');
       pin.type = 'button';
-      pin.className = 'mark-pin' + cls + (a.shape === 'RECT' ? ' on-rect' : '');
+      pin.className = 'mark-pin' + cls + (a.shape === 'RECT' ? ' on-rect' : '') + (a.shape === 'ARROW' || a.shape === 'DRAW' ? ' on-stroke' : '');
       pin.style.left = p.left + 'px';
       pin.style.top = p.top + 'px';
       pin.textContent = a.draft ? '+' : String(a.seq_no);
@@ -170,6 +221,36 @@
       }
       layer.appendChild(pin);
     });
+  };
+
+  /** Dấu mũi tên trong SVG dùng chung (đầu mũi tên tự đổi màu theo nét). */
+  Annotator.prototype.svgDefs = function (svg) {
+    var defs = svgEl('defs');
+    ['pin', 'ok', 'sel', 'draft', 'urgent'].forEach(function (k) {
+      var m = svgEl('marker', { id: 'pp-head-' + k, viewBox: '0 0 10 10', refX: '7', refY: '5', markerWidth: '5', markerHeight: '5', orient: 'auto-start-reverse' });
+      m.appendChild(svgEl('path', { d: 'M0 0 10 5 0 10z', class: 'mark-head head-' + k }));
+      defs.appendChild(m);
+    });
+    svg.appendChild(defs);
+  };
+
+  /** Vẽ mũi tên hoặc nét vẽ tay theo toạ độ ảnh gốc; có thêm một nét trong suốt rộng để dễ bấm chọn. */
+  Annotator.prototype.drawStroke = function (svg, shape, points, c, cls, id) {
+    var self = this;
+    var d = points.map(function (pt, i) { var s = C.toScreen(pt[0], pt[1], c); return (i ? 'L' : 'M') + s.left.toFixed(1) + ' ' + s.top.toFixed(1); }).join(' ');
+    var g = svgEl('g', { class: cls, 'data-stroke': id || '' });
+    var head = /is-selected/.test(cls) ? 'sel' : /is-draft|mark-preview/.test(cls) ? 'draft' : /is-resolved/.test(cls) ? 'ok' : /prio-URGENT/.test(cls) ? 'urgent' : 'pin';
+    var line = svgEl('path', { d: d, class: 'stroke-line' });
+    if (shape === 'ARROW') { line.setAttribute('marker-end', 'url(#pp-head-' + head + ')'); }
+    g.appendChild(line);
+    if (id) {
+      var hit = svgEl('path', { d: d, class: 'stroke-hit' });
+      hit.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      hit.addEventListener('click', function (e) { e.stopPropagation(); if (self.opt.onSelect) { self.opt.onSelect(id); } });
+      g.appendChild(hit);
+    }
+    svg.appendChild(g);
+    return g;
   };
 
   /** Thẻ xem nhanh khi rê chuột lên dấu (nội dung gán bằng textContent). */
@@ -199,9 +280,9 @@
   Annotator.prototype.draftScreenBox = function () {
     if (!this.draft) { return null; }
     var c = this.content();
-    var d = this.draft;
-    var tl = C.toScreen(d.x, d.y, c);
-    return { left: tl.left, top: tl.top, right: tl.left + (d.w || 0) * c.scale, bottom: tl.top + (d.h || 0) * c.scale };
+    var b = bbox(this.draft);
+    var tl = C.toScreen(b.x, b.y, c);
+    return { left: tl.left, top: tl.top, right: tl.left + b.w * c.scale, bottom: tl.top + b.h * c.scale };
   };
 
   Annotator.prototype.local = function (e) {
@@ -216,6 +297,10 @@
     this.drag = { mode: mode, start: p, startState: { zoom: this.state.zoom, panX: this.state.panX, panY: this.state.panY },
       img: C.toImage(p.x, p.y, this.content(), this.imageW, this.imageH) };
     if (mode === 'pan') { this.box.classList.add('is-panning'); }
+    if ((mode === 'arrow' || mode === 'draw') && this.drag.img.inside) {
+      this.drag.points = [clampPt(this.drag.img, this.imageW, this.imageH)];
+      this.drag.screen = p;
+    }
     this.box.setPointerCapture(e.pointerId);
     e.preventDefault();
   };
@@ -244,7 +329,26 @@
       s.width = (r.w * c.scale) + 'px'; s.height = (r.h * c.scale) + 'px';
       this.preview.hidden = false;
       d.rect = r;
+    } else if ((d.mode === 'arrow' || d.mode === 'draw') && d.points) {
+      var cc = this.content();
+      var pt = clampPt(C.toImage(p.x, p.y, cc, this.imageW, this.imageH), this.imageW, this.imageH);
+      if (d.mode === 'arrow') {
+        d.points = [d.points[0], pt];
+      } else if (Math.hypot(p.x - d.screen.x, p.y - d.screen.y) >= 3) { // bỏ điểm quá sát nhau
+        d.points.push(pt);
+        d.screen = p;
+      }
+      this.renderPreview(d.mode === 'arrow' ? 'ARROW' : 'DRAW', d.points);
     }
+  };
+
+  /** Nét đang vẽ (chưa lưu), vẽ lại riêng để không phải dựng lại mọi dấu khi rê chuột. */
+  Annotator.prototype.renderPreview = function (shape, points) {
+    var svg = this.layer.querySelector('.annotator-svg');
+    if (!svg) { return; }
+    var old = svg.querySelector('.mark-preview');
+    if (old) { old.remove(); }
+    if (points && points.length > 1) { this.drawStroke(svg, shape, points, this.content(), 'mark-stroke mark-preview', null); }
   };
 
   Annotator.prototype.onUp = function (e) {
@@ -259,6 +363,21 @@
       if (this.opt.onOutside) { this.opt.onOutside(); }
       return;
     }
+    if (d.mode === 'arrow' || d.mode === 'draw') {
+      this.renderPreview(null, null);
+      var pts = d.points || [];
+      if (d.mode === 'draw') {
+        if (pts.length > 2) { pts = simplify(pts, 0.6); }
+        var eps = 1;
+        while (pts.length > MAX_DRAW_POINTS) { pts = simplify(pts, eps); eps *= 2; }
+      }
+      if (pts.length < 2 || pathLength(pts) < MIN_STROKE) {
+        if (this.opt.onTooShort) { this.opt.onTooShort(d.mode); }
+        return;
+      }
+      this.setDraft({ shape: d.mode === 'arrow' ? 'ARROW' : 'DRAW', x: pts[0][0], y: pts[0][1], w: null, h: null, points: pts });
+      return;
+    }
     if (d.mode === 'rect' && moved && d.rect && d.rect.w >= 2 && d.rect.h >= 2) {
       this.setDraft({ shape: 'RECT', x: d.rect.x, y: d.rect.y, w: d.rect.w, h: d.rect.h });
     } else if (!moved) {
@@ -267,7 +386,7 @@
   };
 
   Annotator.prototype.setDraft = function (pos) {
-    this.draft = pos ? { draft: true, shape: pos.shape, x: pos.x, y: pos.y, w: pos.w, h: pos.h, status: 'OPEN' } : null;
+    this.draft = pos ? { draft: true, shape: pos.shape, x: pos.x, y: pos.y, w: pos.w, h: pos.h, points: pos.points || null, status: 'OPEN' } : null;
     this.render();
     if (pos && this.opt.onDraft) { this.opt.onDraft(pos); }
   };
@@ -279,5 +398,7 @@
     this.setZoom(this.state.zoom * factor, p.x, p.y);
   };
 
+  Annotator.simplify = simplify;
+  Annotator.pathLength = pathLength;
   root.Annotator = Annotator;
 })(window);

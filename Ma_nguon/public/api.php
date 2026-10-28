@@ -8,7 +8,7 @@ declare(strict_types=1);
  *   rồi kiểm tra quyền ở máy chủ; 4) trả mã lỗi ổn định (FORBIDDEN, CONFLICT...).
  *
  * GET  ?action=list&version=ID[&status=OPEN|RESOLVED][&author=ID]
- * POST action=create   {version_id, shape, x, y, w, h, body}
+ * POST action=create   {version_id, shape: POINT|RECT|ARROW|DRAW, x, y, w, h, points[[x,y]...], body}
  * POST action=reply    {annotation_id, body}
  * POST action=edit     {comment_id, body, lock_version}
  * POST action=status   {annotation_id, to, lock_version, checked_version_id, note}
@@ -16,6 +16,7 @@ declare(strict_types=1);
  * POST action=react    {comment_id, kind: LIKE|HEART|PARTY|EYES}
  * GET  ?action=activity&project=ID[&screen=ID]   nhật ký hoạt động gần đây
  * GET  ?action=notifications                     thông báo của tôi + số chưa đọc (bản 2.1)
+ * GET  ?action=notif_poll&after=ID               số chưa đọc + thông báo mới hơn ID (bản 2.3, chuông tự cập nhật)
  * POST action=notif_read {id (0 = tất cả)}       đánh dấu đã đọc
  * POST action=chat   {message, history[]}        trợ lý ảo trả lời câu hỏi về ứng dụng
  */
@@ -44,6 +45,12 @@ try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'GET') {
+        if (field($_GET, 'action') === 'notif_poll') {
+            // Gọi vài giây một lần: rất nhẹ (một COUNT + tối đa 5 thông báo mới).
+            $n = new NotificationRepository($c);
+            $after = intField($_GET, 'after');
+            respond(200, ['unread' => $n->unreadCount($userId), 'latest' => $n->latestId($userId), 'items' => $after > 0 ? $n->since($userId, $after) : []]);
+        }
         if (field($_GET, 'action') === 'notifications') {
             $n = new NotificationRepository($c);
             respond(200, ['unread' => $n->unreadCount($userId), 'items' => $n->listFor($userId, 15)]);
@@ -78,7 +85,7 @@ try {
             Access::require($c, $userId, Access::projectOfVersion($c, $versionId), Access::COMMENT);
             $meta = array_intersect_key($input, array_flip(['priority', 'category', 'assignee_id', 'due_date']));
             $item = $repo->create($versionId, (string) ($input['shape'] ?? ''), $input['x'] ?? null, $input['y'] ?? null,
-                $input['w'] ?? null, $input['h'] ?? null, (string) ($input['body'] ?? ''), $userId, $meta);
+                $input['w'] ?? null, $input['h'] ?? null, (string) ($input['body'] ?? ''), $userId, $meta, $input['points'] ?? null);
             respond(201, ['item' => $item]);
         case 'reply':
             $annotationId = (int) ($input['annotation_id'] ?? 0);

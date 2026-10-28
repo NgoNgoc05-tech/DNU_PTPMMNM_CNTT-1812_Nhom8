@@ -29,6 +29,7 @@
       onPinHover: function (id) { panel.highlight(id); },
       onLayout: function (view) {
         if (key === 'right' && overlay) { overlay.setView(view.state); }
+        if (key === 'right') { placeDiff(); }
         if (!sync.checked || syncing) { return; }
         var other = views[key === 'left' ? 'right' : 'left'];
         if (!other) { return; }
@@ -94,8 +95,83 @@
       handle.hidden = true;
     }
   }
+  // ---------------------------------------------------- chế độ tô đỏ chỗ khác nhau (bản 2.3)
+  var diffCard = document.getElementById('diff-card');
+  var diffCanvas = null;
+  var diffData = null;
+  var diffResult = null;
+  var thr = document.getElementById('diff-threshold');
+  var dim = document.getElementById('diff-dim');
+  function placeDiff() {
+    if (!diffCanvas) { return; }
+    var c = views.right.content(), st = diffCanvas.style;
+    st.left = c.left + 'px'; st.top = c.top + 'px'; st.width = c.width + 'px'; st.height = c.height + 'px';
+  }
+  function runDiff() {
+    if (!diffData) { return; }
+    diffResult = diffData.run(Number(thr.value));
+    window.PinDiff.paint(diffCanvas, diffData, diffResult, dim.checked);
+    placeDiff();
+    var n = diffResult.regions.length;
+    document.getElementById('diff-threshold-v').textContent = thr.value;
+    document.getElementById('diff-summary').textContent = n === 0
+      ? 'Không thấy khác biệt ở độ nhạy này'
+      : n + ' vùng thay đổi · ' + String(diffResult.percent).replace('.', ',') + '% diện tích ảnh';
+    var list = document.getElementById('diff-regions');
+    list.textContent = '';
+    diffResult.regions.forEach(function (r, i) {
+      list.appendChild(Pin.el('button', { type: 'button', class: 'diff-chip', 'data-region': i + 1,
+        title: 'Vùng ' + (i + 1) + ': (' + Math.round(r.x) + '; ' + Math.round(r.y) + ') ' + Math.round(r.w) + '×' + Math.round(r.h) + ' px',
+        onclick: function () { views.right.focusRect(r.x, r.y, r.w, r.h); } }, [String(i + 1)]));
+    });
+    if (n) {
+      list.appendChild(Pin.el('button', { type: 'button', class: 'diff-chip diff-all', text: 'Xem toàn ảnh', onclick: function () { views.right.fit(); } }));
+    }
+  }
+  function startDiff() {
+    var stage = document.getElementById('stage-right');
+    diffCard.hidden = false;
+    if (!diffCanvas) {
+      diffCanvas = Pin.el('canvas', { class: 'diff-canvas', 'aria-hidden': 'true' });
+      stage.insertBefore(diffCanvas, views.right.layer);
+    }
+    diffCanvas.hidden = false;
+    if (diffData) { runDiff(); return; }
+    window.PinDiff.analyse(cfg.left, cfg.right).then(function (d) {
+      diffData = d;
+      if (!d.sameSize) {
+        document.getElementById('diff-note').textContent = 'Hai phiên bản khác kích thước (v' + cfg.left.no + ' ' + cfg.left.width + '×' + cfg.left.height +
+          ', v' + cfg.right.no + ' ' + cfg.right.width + '×' + cfg.right.height + '); bản cũ được co giãn cho khớp nên kết quả chỉ mang tính gợi ý.';
+      }
+      if (mode === 'diff') { runDiff(); }
+    }).catch(function (err) { document.getElementById('diff-summary').textContent = err.message; });
+  }
+  function stopDiff() {
+    diffCard.hidden = true;
+    if (diffCanvas) { diffCanvas.hidden = true; }
+  }
+  thr.addEventListener('input', function () { document.getElementById('diff-threshold-v').textContent = thr.value; });
+  thr.addEventListener('change', runDiff);
+  dim.addEventListener('change', runDiff);
+  window.pinpointDiff = function () { return diffResult; }; // dùng cho kiểm thử trên trình duyệt
+
   function setMode(m) {
     mode = m;
+    if (m === 'diff') {
+      if (overlayWrap) { overlayWrap.remove(); handle.remove(); overlay = null; overlayWrap = null; }
+      control.hidden = true;
+      legend.hidden = false;
+      compare.className = 'compare mode-diff';
+      document.getElementById('mode-input').value = m;
+      document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
+      var u = new URL(location.href);
+      u.searchParams.set('mode', m);
+      history.replaceState(null, '', u);
+      views.right.layout();
+      startDiff();
+      return;
+    }
+    stopDiff();
     document.getElementById('mode-input').value = m;
     compare.className = 'compare mode-' + m;
     document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
@@ -147,6 +223,7 @@
   document.addEventListener('keydown', function (e) {
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.ctrlKey || e.metaKey) { return; }
     if (e.key === '1') { setMode('side'); } else if (e.key === '2') { setMode('swipe'); } else if (e.key === '3') { setMode('onion'); }
+    else if (e.key === '4') { setMode('diff'); }
     else if (e.key === 'Escape') { choose(null); }
   });
   fStatus.addEventListener('change', load);

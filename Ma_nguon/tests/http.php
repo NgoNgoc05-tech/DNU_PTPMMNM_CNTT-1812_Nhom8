@@ -189,7 +189,93 @@ try {
     [$st] = $viewer->request('GET', '/profile.php');
     same($st, 200, 'http-profile-page');
 
+    echo "-- Bản 2.2: lời mời và bộ phận hỗ trợ qua HTTP\n";
+    $B = $fx['projects']['B'];
+    [$st] = $designer->request('POST', '/members.php', http_build_query(['csrf' => $designer->csrf, 'project_id' => $B, 'action' => 'add',
+        'email' => $email('viewer'), 'role' => 'COMMENT', 'message' => 'Mời vào B']), $form);
+    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [303, null], 'http-invite-does-not-add-member');
+    $inv = (new ProjectRepository($c))->pendingInvitations($B)[0];
+    [$st] = $reviewer->request('POST', '/invitation.php', http_build_query(['csrf' => $reviewer->csrf, 'invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
+    same([$st, Access::roleFor($c, $fx['users']['V'], $B), count((new ProjectRepository($c))->pendingInvitations($B))], [303, null, 1],
+        'http-other-user-cannot-accept-invite');
+    [$st] = $viewer->request('POST', '/invitation.php', http_build_query(['invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
+    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [403, null], 'http-accept-needs-csrf');
+    [$st, $hd] = $viewer->request('POST', '/invitation.php', http_build_query(['csrf' => $viewer->csrf, 'invitation_id' => $inv['id'], 'answer' => 'accept']), $form);
+    same([$st, Access::roleFor($c, $fx['users']['V'], $B)], [303, 'COMMENT'], 'http-invitee-accepts');
+    [$st] = $viewer->request('GET', '/support_admin.php');
+    same($st, 403, 'http-support-desk-forbidden');
+    $staff = new Browser($base);
+    $staff->login($email('hotro'));
+    [$st, , $html] = $staff->request('GET', '/support_admin.php?status=OPEN');
+    same([$st, str_contains($html, '&lt;b&gt;Lỗi&lt;/b&gt; tải ảnh')], [200, true], 'http-support-desk-lists-escaped');
+    $tid = (int) fetchOne($c, "SELECT id FROM support_tickets WHERE subject = '<b>Lỗi</b> tải ảnh' ORDER BY id DESC LIMIT 1")['id'];
+    [$st] = $staff->request('POST', '/support_admin.php', http_build_query(['csrf' => $staff->csrf, 'id' => $tid, 'reply' => 'Đã sửa', 'status' => 'ANSWERED']), $form);
+    [, , $html] = $viewer->request('GET', '/help.php');
+    same([$st, str_contains($html, 'Đã sửa'), str_contains($html, 'Bộ phận hỗ trợ Pinpoint trả lời')], [303, true, true], 'http-support-reply-visible-to-user');
+
     $boundary = 'pinpointboundary';
+    echo "-- Bản 2.3: vẽ, ảnh đính kèm, thông báo tức thời, quên mật khẩu, quản trị qua HTTP\n";
+    [$st, , $body] = $reviewer->api(['action' => 'create', 'version_id' => $vA, 'shape' => 'ARROW', 'points' => [[750, 150], [300, 300]], 'body' => 'Mũi tên qua HTTP']);
+    $arrowItem = json_decode($body, true)['item'] ?? [];
+    same([$st, $arrowItem['shape'] ?? '', $arrowItem['points'] ?? null], [201, 'ARROW', [[750, 150], [300, 300]]], 'http-create-arrow');
+    [$st] = $reviewer->api(['action' => 'create', 'version_id' => $vA, 'shape' => 'DRAW', 'points' => [[1, 1]], 'body' => 'x']);
+    same($st, 422, 'http-draw-one-point-rejected');
+    [, , $body] = $reviewer->api(['action' => 'reply', 'annotation_id' => $arrowItem['id'], 'body' => 'Kèm ảnh chụp']);
+    $replyId = (int) (json_decode($body, true)['id'] ?? 0);
+    $png = (string) file_get_contents(__DIR__ . '/../database/fixtures/a-trang-chu-v1.png');
+    $mp = fn (string $csrf, int $cid, string $data, string $name) => "--$boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n$csrf\r\n"
+        . "--$boundary\r\nContent-Disposition: form-data; name=\"comment_id\"\r\n\r\n$cid\r\n"
+        . "--$boundary\r\nContent-Disposition: form-data; name=\"image\"; filename=\"$name\"\r\nContent-Type: image/png\r\n\r\n$data\r\n--$boundary--\r\n";
+    $mpHeader = ["Content-Type: multipart/form-data; boundary=$boundary"];
+    [$st, , $body] = $reviewer->request('POST', '/attachment.php', $mp($reviewer->csrf, $replyId, $png, 'anh-chup.png'), $mpHeader);
+    $attId = (int) (json_decode($body, true)['attachment']['id'] ?? 0);
+    same([$st, $attId > 0], [201, true], 'http-upload-attachment');
+    [$st] = $reviewer->request('POST', '/attachment.php', $mp($reviewer->csrf, $replyId, '<?php echo 1; ?>', 'evil.png'), $mpHeader);
+    same($st, 422, 'http-fake-attachment-rejected');
+    [$st] = $designer->request('POST', '/attachment.php', $mp($designer->csrf, $replyId, $png, 'a.png'), $mpHeader);
+    same($st, 403, 'http-cannot-attach-to-others-comment');
+    [$st, $hd] = $viewer->request('GET', '/attachment.php?id=' . $attId);
+    same([$st, $hd['content-type'] ?? ''], [200, 'image/png'], 'http-member-reads-attachment');
+    $outsider = new Browser($base);
+    $outsider->login($email('hotro'));
+    [$st] = $outsider->request('GET', '/attachment.php?id=' . $attId);
+    same($st, 404, 'http-outsider-cannot-read-attachment');
+    [, , $body] = $designer->request('GET', '/api.php?action=notif_poll&after=0');
+    $poll = json_decode($body, true);
+    [, , $body2] = $designer->request('GET', '/api.php?action=notif_poll&after=' . (int) ($poll['latest'] ?? 0));
+    same([is_int($poll['unread'] ?? null), json_decode($body2, true)['items'] ?? null], [true, []], 'http-notif-poll');
+
+    $anon2 = new Browser($base);
+    [, , $html] = $anon2->request('GET', '/forgot.php');
+    [, , $known] = $anon2->request('POST', '/forgot.php', http_build_query(['csrf' => $anon2->csrf, 'email' => $email('reviewer')]), $form);
+    [, , $html] = $anon2->request('GET', '/forgot.php');
+    [, , $unknown] = $anon2->request('POST', '/forgot.php', http_build_query(['csrf' => $anon2->csrf, 'email' => 'nobody@pinpoint.test']), $form);
+    $strip = fn (string $h) => preg_replace('/name="csrf" value="[a-f0-9]+"/', '', $h);
+    same([str_contains($known, 'data-forgot-sent'), $strip($known) === $strip($unknown)], [true, true], 'http-forgot-same-answer-for-any-email');
+    [$st, , $html] = $anon2->request('GET', '/reset_password.php?token=' . str_repeat('a', 48));
+    same([$st, str_contains($html, 'data-reset-invalid')], [200, true], 'http-reset-bad-token');
+    $tok = PasswordReset::issue($c, $fx['users']['R']);
+    [, , $html] = $anon2->request('GET', '/reset_password.php?token=' . $tok);
+    [$st, $hd, $html] = $anon2->request('POST', '/reset_password.php', http_build_query(['csrf' => $anon2->csrf, 'token' => $tok,
+        'password' => 'DoiMoi123', 'password2' => 'DoiMoi123']), $form);
+    same([str_contains($html, 'data-reset-done'), $hd['referrer-policy'] ?? ''], [true, 'no-referrer'], 'http-reset-password-via-link');
+    queryParams($c, 'UPDATE users SET password_hash = $2 WHERE id = $1', [$fx['users']['R'], password_hash('Pinpoint@123', PASSWORD_DEFAULT)]);
+
+    [$st] = $designer->request('GET', '/admin.php');
+    same($st, 403, 'http-admin-forbidden-for-user');
+    $adminB = new Browser($base);
+    $adminB->login($email('admin'));
+    [$st, , $html] = $adminB->request('GET', '/admin.php?tab=users&q=' . rawurlencode('+' . $suffix));
+    same([$st, str_contains($html, e($email('viewer')))], [200, true], 'http-admin-lists-users');
+    [$st] = $adminB->request('POST', '/admin.php?tab=users', http_build_query(['csrf' => $adminB->csrf, 'action' => 'lock', 'target' => $fx['users']['V'], 'reason' => 'HTTP']), $form);
+    [$st2] = $viewer->request('GET', '/api.php?action=notifications');
+    same([$st, $st2], [303, 401], 'http-locked-user-session-ends');
+    [$st] = $adminB->request('POST', '/admin.php?tab=users', http_build_query(['action' => 'unlock', 'target' => $fx['users']['V']]), $form);
+    same($st, 403, 'http-admin-action-needs-csrf');
+    $adminB->request('POST', '/admin.php?tab=users', http_build_query(['csrf' => $adminB->csrf, 'action' => 'unlock', 'target' => $fx['users']['V']]), $form);
+    [$st, , $html] = $adminB->request('GET', '/admin.php?tab=projects');
+    same([$st, str_contains($html, 'id="admin-projects"')], [200, true], 'http-admin-projects-tab');
+
     $multipart = "--$boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{$designer->csrf}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"screen_id\"\r\n\r\n{$first['screen_id']}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"image\"; filename=\"evil.png\"\r\nContent-Type: image/png\r\n\r\n<?php system('id'); ?>\r\n"

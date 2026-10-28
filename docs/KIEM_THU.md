@@ -4,11 +4,11 @@
 
 | Lệnh | Bộ kiểm thử | Cần | Số ca |
 |---|---|---|---|
-| `php tests/run.php` | Đơn vị: quyền, toạ độ, escape, CSV, giới hạn ảnh, hiển thị dùng chung | PHP | 56 |
-| `node --test tests/js/coords.test.mjs` | Hàm toạ độ JavaScript dùng trong trình duyệt | Node ≥ 18 | 6 |
-| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (2.0) + thông báo, xoá, hồ sơ, hỗ trợ (2.1) trên PostgreSQL thật | PostgreSQL | 95 |
-| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0 | PostgreSQL | 36 |
-| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối | Máy chủ đang chạy + Playwright | 31 |
+| `php tests/run.php` | Đơn vị: quyền, toạ độ, mũi tên/vẽ tay, escape, CSV, giới hạn ảnh, hiển thị dùng chung, trợ lý ảo | PHP | 66 |
+| `node --test tests/js/coords.test.mjs tests/js/drawing.test.mjs` | Hàm toạ độ JavaScript; so điểm ảnh “Tô chỗ khác”; rút gọn nét vẽ tay | Node ≥ 18 | 10 |
+| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (2.0) + thông báo, xoá, hồ sơ, hỗ trợ (2.1) + lời mời, bộ phận hỗ trợ (2.2) + mũi tên/vẽ tay, ảnh đính kèm, thông báo tức thời, quên mật khẩu, quản trị (2.3) trên PostgreSQL thật | PostgreSQL | 160 |
+| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0, lời mời, trang bộ phận hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | PostgreSQL | 59 |
+| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối, lịch hạn xử lý, lời mời, bộ phận hỗ trợ, mũi tên/vẽ tay, dán ảnh chụp, thông báo tức thời, tô chỗ khác, quên mật khẩu, quản trị | Máy chủ đang chạy + Playwright | 68 |
 
 `bash lab.sh test` chạy bốn bộ đầu và in `KET_QUA=TAT_CA_DAT` khi tất cả đều đạt. GitHub Actions (`.github/workflows/ci.yml`) chạy cả năm bộ
 trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Request.
@@ -37,12 +37,19 @@ trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Requ
 | 8 | Chạy e2e lần thứ hai thất bại ở bước khoanh vùng | `bash lab.sh e2e` chạy lặp | Góc trên-trái vùng mới trùng dấu của lần chạy trước nên thao tác kéo chọn nhầm dấu cũ | Bài e2e bật nút “Ẩn mọi dấu” trước khi vẽ (dùng chính tính năng mới) | Chạy e2e hai lần liên tiếp: 26/26 đạt cả hai |
 | 9 | Menu tài khoản và menu “Thêm thao tác” bị kéo dãn hết chiều ngang | Ảnh chụp giao diện (bản 2.0) | Hai quy tắc CSS cùng độ ưu tiên đặt cả `left` và `right` | Thêm lớp `menu-right` cho menu căn phải | Chụp lại các trang có menu |
 | 10 | Trang phép thử toạ độ báo “KHÔNG ĐẠT” trên máy thành viên (lệch 0,4 px) | Thành viên chạy thử trên Windows phóng to 125% | Trang đo tâm dấu bằng `getBoundingClientRect`, giá trị bị làm tròn tới pixel thiết bị; dấu thực ra vẫn đúng (đổi ngược ≈ 749,2; 149,2) | So sánh bằng toạ độ CSS mà trình xem đặt cho dấu (`style.left/top`); vị trí thật trên màn hình vẫn được e2e kiểm tra với sai số ≤ 1 px | e2e `t1-calibration-page-4-cases`, `t1-viewer-*` |
+| 11 | Mời thành viên thêm ngay người đó vào dự án, không cần họ đồng ý | Thành viên nhóm dùng thử (bản 2.1) | `members.php` gọi thẳng `INSERT INTO project_members` | Thêm bảng `project_invitations`; mời tạo lời mời PENDING, chỉ khi người nhận bấm Chấp nhận mới thêm vào dự án | `v22-invitee-not-member-yet`, `v22-other-user-cannot-accept`, `http-invite-does-not-add-member`, e2e `v22-invitee-cannot-open-before-accept` |
+| 12 | Yêu cầu hỗ trợ đứng mãi ở “Đang chờ”, không ai xử lý trong ứng dụng | Thành viên nhóm dùng thử (bản 2.1) | Chỉ trả lời được bằng `php tools/support.php` | Thêm quyền `users.is_support`, trang `/support_admin.php`, thông báo TICKET / TICKET_REPLY | `v22-new-ticket-notifies-support`, `v22-reply-notifies-user-with-handler`, e2e `v22-user-sees-reply` |
+| 13 | Lưu thông báo loại `INVITE_REPLY` báo “value too long for type character varying(10)” | `tests/integration.php` (bản 2.2) | Cột `notifications.kind` là `varchar(10)` | `ALTER COLUMN kind TYPE varchar(20)` trong `schema.sql` (chạy lại được trên CSDL cũ) | Reset rồi chạy lại: 116/116 đạt |
+| 14 | Lịch chọn ngày hiện tiếng Anh (October 2026, Su Mo…) | Thành viên dùng Chrome tiếng Anh | Dùng `input type=date` gốc của trình duyệt | Tự vẽ lịch tiếng Việt trong `thread.js`, bỏ ô ngày gốc | e2e `v22-vietnamese-calendar`, `v22-no-native-english-picker` |
+| 15 | Nút “Tải phiên bản mới” biến mất khỏi trình xem của Quản lý dự án | e2e (bản 2.3, lỗi `Timeout waiting for [data-open=dlg-version]`) | `templates/header.php` thêm biến `$isAdmin` (quản trị hệ thống) trùng tên với `$isAdmin` (quản lý dự án) của `screen.php`, ghi đè giá trị trước khi phần thân trang dùng tới | Đổi tên biến trong header thành `$isSysAdmin` | e2e 68/68, chạy lại 2 lần liên tiếp đều đạt |
+| 16 | Có thể lưu mũi tên không có toạ độ nét (`points` NULL) bằng SQL trực tiếp | `tests/integration.php` (`v23-db-constraint-arrow-needs-points`) | `jsonb_typeof(NULL)` cho NULL, ràng buộc CHECK coi NULL là đạt | Thêm `points IS NOT NULL` vào `annotations_geometry_check` | Reset rồi chạy lại: 160/160 |
+| 17 | Bấm “Cấp link đặt lại mật khẩu” xong không thấy link | e2e (bản 2.3) | Yêu cầu chuyển sang “Đã trả lời” nên biến mất khỏi bộ lọc “Đang chờ” đang mở | Sau khi cấp link chuyển sang mục “Tất cả” và cuộn tới đúng yêu cầu | e2e `v23-support-issues-reset-link` |
 
-## 4. Kết quả lần chạy cuối (bản 2.1, 24/10/2026)
+## 4. Kết quả lần chạy cuối (bản 2.3, 28/10/2026)
 
 Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từng bộ kiểm thử.
 
-### Đơn vị — `tests/run.php` (TESTS=56 FAILED=0)
+### Đơn vị — `tests/run.php` (TESTS=66 FAILED=0)
 
 **Phân quyền (ma trận VIEW / COMMENT / ADMIN)**: `view-can-view`, `view-cannot-comment`, `comment-can-comment`, `comment-cannot-manage`, `admin-can-comment`, `non-member-denied`, `unknown-role-denied`
 
@@ -56,13 +63,15 @@ Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từn
 
 **Bản 2.1: trợ lý ảo (chạy trên máy, không cần mạng)**: `assistant-fold-vietnamese`, `assistant-delete-image`, `assistant-compare`, `assistant-invite`, `assistant-unknown-question`, `assistant-whole-word-match`, `assistant-question-length`, `mention-name-without-role`
 
+**Bản 2.3: mũi tên và nét vẽ tay (toạ độ ảnh gốc, kiểm tra ở máy chủ)**: `arrow-valid-first-point-is-anchor`, `arrow-needs-exactly-2-points`, `arrow-end-outside-image`, `arrow-too-short`, `draw-valid`, `draw-max-500-points`, `draw-point-must-be-pair`, `draw-points-must-be-list`, `shape-label-arrow`
+
 **Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)**: `png-accepted`, `jpeg-accepted`, `gif-rejected`, `fake-png-rejected`, `over-5mb-rejected`, `tiny-rejected`, `stored-name-path-traversal`, `non-uploaded-path-rejected`
 
-### JavaScript — `tests/js/coords.test.mjs` (pass 6, fail 0)
+### JavaScript — `tests/js/coords.test.mjs`, `tests/js/drawing.test.mjs` (pass 10, fail 0)
 
-fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomAround giữ điểm dưới con trỏ, trường hợp phóng to 200%.
+fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomAround giữ điểm dưới con trỏ, trường hợp phóng to 200%; bản 2.3: hai ảnh giống nhau không có vùng thay đổi, nút dời chỗ cho đúng hai vùng (chỗ cũ và chỗ mới), bỏ nhiễu lẻ tẻ và khác biệt dưới ngưỡng, rút gọn nét vẽ tay giữ hai đầu.
 
-### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=95 FAILED=0)
+### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=160 FAILED=0)
 
 **Dữ liệu mẫu có đáp án**: `seed-20-annotations`, `seed-11-points`, `seed-9-rects`, `seed-13-open`, `seed-12-image-versions`, `seed-3-roles`
 
@@ -80,17 +89,35 @@ fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomArou
 
 **Bản 2.1: thông báo, xoá ảnh tải nhầm, hồ sơ, hỗ trợ khách hàng**: `v21-mention-notifies-designer`, `v21-mention-notifies-viewer-member`, `v21-no-self-notification`, `v21-assign-notifies`, `v21-reply-notifies-author`, `v21-status-notifies-author`, `v21-mark-all-read`, `v21-cannot-mark-others-notification`, `v21-delete-wrong-version-only`, `v21-cannot-delete-last-version`, `v21-delete-screen`, `v21-deleted-screen-gone`, `v21-only-owner-deletes-project`, `v21-delete-project-needs-name`, `v21-project-deleted`, `v21-profile-title`, `v21-password-needs-current`, `v21-password-repeat`, `v21-password-changed`, `v21-ticket-validated`, `v21-ticket-answered-and-private`, `v21-cannot-close-others-ticket`
 
+**Bản 2.2: bộ phận hỗ trợ xử lý yêu cầu**: `v22-support-role`, `v22-new-ticket-notifies-support`, `v22-support-sees-all-open`, `v22-reply-notifies-user-with-handler`, `v22-status-only-change-no-duplicate-notice`, `v22-answer-missing-ticket`
+
+**Bản 2.2: lời mời tham gia dự án phải được chấp nhận**: `v22-invite-created`, `v22-invitee-not-member-yet`, `v22-pending-listed-for-manager`, `v22-invitee-sees-invitation`, `v22-invite-notification`, `v22-reinvite-updates-pending`, `v22-no-duplicate-pending`, `v22-other-user-cannot-accept`, `v22-accept`, `v22-member-after-accept-with-latest-role`, `v22-inviter-notified`, `v22-cannot-answer-twice`, `v22-decline-not-member`, `v22-cancelled-invite-unusable`, `v22-invite-existing-member-updates-role`
+
+**Bản 2.3: mũi tên, vẽ tay, ảnh đính kèm**: `v23-arrow-saved-in-original-pixels`, `v23-draw-saved`, `v23-arrow-outside-rejected-by-server`, `v23-db-constraint-arrow-needs-points`, `v23-export-shape-label`, `v23-attachment-added`, `v23-only-author-attaches`, `v23-attachment-listed-with-reply`, `v23-attachment-belongs-to-project`, `v23-max-4-attachments`, `v23-attachment-files-tracked`
+
+**Bản 2.3: thông báo tức thời**: `v23-poll-returns-only-new`, `v23-poll-nothing-new`
+
+**Bản 2.3: quên mật khẩu**: `v23-forgot-unknown-email-ignored`, `v23-forgot-creates-ticket`, `v23-reset-ticket-has-contact`, `v23-repeat-request-no-duplicate-ticket`, `v23-admin-is-support-staff`, `v23-token-valid`, `v23-token-stored-hashed-only`, `v23-new-link-invalidates-old`, `v23-reset-repeat-must-match`, `v23-reset-password`, `v23-new-password-works`, `v23-link-single-use`, `v23-reset-closes-ticket`, `v23-link-expires-after-30-min`, `v23-malformed-token`
+
+**Bản 2.3: quản trị hệ thống**: `v23-admin-role`, `v23-system-stats`, `v23-daily-14-days`, `v23-search-users`, `v23-cannot-lock-self`, `v23-locked-cannot-login`, `v23-locked-cannot-reset-password`, `v23-filter-locked`, `v23-unlocked-can-login`, `v23-cannot-drop-own-admin`, `v23-grant-support`, `v23-admin-reset-link`, `v23-admin-joins-project-as-manager`, `v23-admin-delete-needs-name`, `v23-admin-deleted-project`, `v23-admin-actions-logged`
+
 **Tìm kiếm và xuất danh sách**: `search-open-only`, `search-by-text`, `search-percent-is-literal`, `filter-by-author`, `export-header`, `export-row-count`
 
-### HTTP — `tests/http.php` (TESTS=36 FAILED=0)
+### HTTP — `tests/http.php` (TESTS=59 FAILED=0)
 
 `http-anonymous-api-401`, `http-anonymous-image-denied`, `http-viewer-reads-image-A`, `http-viewer-cannot-read-image-B-by-url`, `http-viewer-cannot-read-comments-B-by-url`, `http-viewer-cannot-open-screen-B`, `http-viewer-cannot-export-B`, `http-viewer-cannot-create`, `http-viewer-cannot-reply`, `http-viewer-cannot-change-status`, `http-missing-csrf-rejected`, `http-comment-stored-literally`, `http-comment-rendered-as-text`, `http-csp-header`, `http-outside-image-422`, `http-export-csv`
 
 **Bản 2.0: thuộc tính, ghi chú, cảm xúc, nhật ký qua HTTP**: `http-viewer-cannot-edit-note`, `http-viewer-cannot-react`, `http-viewer-cannot-read-activity-B`, `http-reviewer-updates-priority-and-note`, `http-stale-update-conflict-409`, `http-reviewer-reacts`, `http-invalid-reaction-422`, `http-activity-newest-first`, `http-reviewer-cannot-rename-project`, `http-inbox-page`
 
-**Bản 2.1: xoá, thông báo, trợ lý ảo, hỗ trợ qua HTTP**: `http-reviewer-cannot-delete-version`, `http-outsider-cannot-delete-screen-B`, `http-delete-needs-csrf`, `http-notifications-api`, `http-mark-all-read`, `http-chat-assistant`, `http-chat-requires-login`, `http-support-ticket-escaped`, `http-profile-page`, `http-fake-image-upload-rejected`
+**Bản 2.1: xoá, thông báo, trợ lý ảo, hỗ trợ qua HTTP**: `http-reviewer-cannot-delete-version`, `http-outsider-cannot-delete-screen-B`, `http-delete-needs-csrf`, `http-notifications-api`, `http-mark-all-read`, `http-chat-assistant`, `http-chat-requires-login`, `http-support-ticket-escaped`, `http-profile-page`
 
-### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=31 FAILED=0)
+**Bản 2.2: lời mời và bộ phận hỗ trợ qua HTTP**: `http-invite-does-not-add-member`, `http-other-user-cannot-accept-invite`, `http-accept-needs-csrf`, `http-invitee-accepts`, `http-support-desk-forbidden`, `http-support-desk-lists-escaped`, `http-support-reply-visible-to-user`, `http-fake-image-upload-rejected`
 
-`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v21-delete-wrong-version`, `v21-due-date-dd-mm-yyyy`, `v21-bell-shows-unread`, `v21-mention-notification-listed`, `v21-assistant-answers`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
+**Bản 2.3: vẽ, ảnh đính kèm, thông báo tức thời, quên mật khẩu, quản trị qua HTTP**: `http-create-arrow`, `http-draw-one-point-rejected`, `http-upload-attachment`, `http-fake-attachment-rejected`, `http-cannot-attach-to-others-comment`, `http-member-reads-attachment`, `http-outsider-cannot-read-attachment`, `http-notif-poll`, `http-forgot-same-answer-for-any-email`, `http-reset-bad-token`, `http-reset-password-via-link`, `http-admin-forbidden-for-user`, `http-admin-lists-users`, `http-locked-user-session-ends`, `http-admin-action-needs-csrf`, `http-admin-projects-tab`, `http-fake-image-upload-rejected`
+
+**Tải tệp giả**: `http-fake-image-upload-rejected`
+
+### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=68 FAILED=0)
+
+`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v21-delete-wrong-version`, `v22-due-date-mm-dd-yyyy`, `v22-due-date-shown-mm-dd-yyyy`, `v22-vietnamese-calendar`, `v22-no-native-english-picker`, `v22-calendar-pick-saves`, `v21-bell-shows-unread`, `v21-mention-notification-listed`, `v21-assistant-answers`, `v22-invite-pending-for-manager`, `v22-invitee-not-member-before-accept`, `v22-invitee-sees-invitation`, `v22-invitee-cannot-open-before-accept`, `v22-accept-opens-project`, `v22-accepted-becomes-member`, `v22-ticket-created`, `v22-support-notified`, `v22-support-desk-lists-ticket`, `v22-user-sees-reply`, `v22-user-notified-of-reply`, `v22-support-desk-forbidden-for-normal-user`, `v23-arrow-saved-in-original-pixels`, `v23-freehand-saved`, `v23-strokes-rendered`, `v23-click-stroke-opens-thread`, `v23-paste-screenshot-adds-attachment`, `v23-attachments-shown-in-reply`, `v23-live-notification-card`, `v23-bell-updates-without-reload`, `v23-diff-finds-changed-regions`, `v23-diff-covers-moved-button`, `v23-diff-region-zooms-in`, `v23-forgot-request-accepted`, `v23-support-issues-reset-link`, `v23-password-reset-via-link`, `v23-reset-link-single-use`, `v23-admin-overview`, `v23-admin-locks-user`, `v23-locked-user-logged-out`, `v23-locked-login-message`, `v23-admin-unlocks-user`, `v23-admin-sees-all-projects`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
 

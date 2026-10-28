@@ -93,7 +93,12 @@ require __DIR__ . '/../templates/header.php';
 <td><?= dueBadge($a['due_date'], $a['overdue']) ?: '<span class="faint">—</span>' ?></td>
 <td><?= statusBadge($a['status']) ?><?= $a['resolved_on_version_no'] ? '<br><span class="hint">kiểm tra trên v' . $a['resolved_on_version_no'] . '</span>' : '' ?></td>
 <td class="nowrap"><?= avatar($a['author'], $a['author_id'], 'sm') ?> <?= e(trim((string) preg_replace('/\(.*?\)/u', '', $a['author']))) ?></td>
-<td class="num coord"><?= $a['shape'] === 'POINT' ? '● (' . e($a['x']) . '; ' . e($a['y']) . ')' : '▭ (' . e($a['x']) . '; ' . e($a['y']) . ') ' . e($a['w']) . '×' . e($a['h']) ?></td>
+<td class="num coord"><?= match ($a['shape']) {
+    'POINT' => '● (' . e($a['x']) . '; ' . e($a['y']) . ')',
+    'RECT' => '▭ (' . e($a['x']) . '; ' . e($a['y']) . ') ' . e($a['w']) . '×' . e($a['h']),
+    'ARROW' => '➝ (' . e($a['points'][0][0]) . '; ' . e($a['points'][0][1]) . ') → (' . e($a['points'][1][0]) . '; ' . e($a['points'][1][1]) . ')',
+    default => '✎ ' . count($a['points'] ?? []) . ' điểm từ (' . e($a['x']) . '; ' . e($a['y']) . ')',
+} ?></td>
 </tr>
 <?php endforeach; ?>
 </tbody>

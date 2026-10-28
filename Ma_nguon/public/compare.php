@@ -35,7 +35,7 @@ if ($left === null || (int) $left['id'] === (int) $right['id']) {
 $projectRepo = new ProjectRepository($c);
 $project = $projectRepo->find((int) $screen['project_id']);
 $members = $projectRepo->members((int) $screen['project_id']);
-$mode = in_array(field($_GET, 'mode'), ['side', 'swipe', 'onion'], true) ? field($_GET, 'mode') : 'side';
+$mode = in_array(field($_GET, 'mode'), ['side', 'swipe', 'onion', 'diff'], true) ? field($_GET, 'mode') : 'side';
 $pack = fn (array $v): array => [
     'id' => (int) $v['id'], 'no' => (int) $v['version_no'], 'width' => (int) $v['width'], 'height' => (int) $v['height'],
     'imageUrl' => '/image.php?id=' . (int) $v['id'], 'open' => (int) $v['open_items'], 'total' => (int) $v['annotations'],
@@ -69,6 +69,7 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" data-mode="side" aria-pressed="<?= $mode === 'side' ? 'true' : 'false' ?>"><?= icon('compare', 'sm') ?>Cạnh nhau</button>
 <button type="button" data-mode="swipe" aria-pressed="<?= $mode === 'swipe' ? 'true' : 'false' ?>"><?= icon('sliders', 'sm') ?>Thanh trượt</button>
 <button type="button" data-mode="onion" aria-pressed="<?= $mode === 'onion' ? 'true' : 'false' ?>"><?= icon('layers', 'sm') ?>Chồng mờ</button>
+<button type="button" data-mode="diff" aria-pressed="<?= $mode === 'diff' ? 'true' : 'false' ?>"><?= icon('diff', 'sm') ?>Tô chỗ khác</button>
 </div>
 <span class="spacer"></span>
 <label class="check"><input type="checkbox" id="sync" checked> Đồng bộ phóng to/kéo</label>
@@ -93,6 +94,13 @@ require __DIR__ . '/../templates/header.php';
 <span class="compare-legend"><?= (int) $right['annotations'] === 0 ? 'chưa có góp ý' : '<span class="badge badge-open">' . (int) $right['open_items'] . ' chưa xử lý</span>' ?></span>
 </div>
 <div id="stage-right" class="annotator" data-tool="pan"></div>
+<div class="diff-card" id="diff-card" hidden aria-live="polite">
+<div class="diff-head"><strong id="diff-summary">Đang tìm chỗ khác nhau…</strong></div>
+<p class="hint" id="diff-note">Vùng tô đỏ là chỗ v<?= (int) $right['version_no'] ?> khác v<?= (int) $left['version_no'] ?>. Bấm số để phóng tới vùng đó.</p>
+<div class="diff-regions" id="diff-regions"></div>
+<label class="diff-row" for="diff-threshold">Độ nhạy <input type="range" id="diff-threshold" min="8" max="120" value="40" aria-label="Ngưỡng khác biệt màu (càng nhỏ càng nhạy)"> <span id="diff-threshold-v">40</span></label>
+<label class="check diff-row"><input type="checkbox" id="diff-dim" checked> Làm mờ phần giống nhau</label>
+</div>
 <div class="overlay-control" id="overlay-control" hidden>
 <span>v<?= (int) $left['version_no'] ?></span><input type="range" id="overlay-range" min="0" max="100" value="50" aria-label="Tỷ lệ hiển thị hai phiên bản"><span>v<?= (int) $right['version_no'] ?></span>
 </div>
@@ -117,5 +125,6 @@ require __DIR__ . '/../templates/header.php';
 <script src="/assets/js/coords.js"></script>
 <script src="/assets/js/annotator.js"></script>
 <script src="/assets/js/thread.js"></script>
+<script src="/assets/js/diff.js"></script>
 <script src="/assets/js/compare.js"></script>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

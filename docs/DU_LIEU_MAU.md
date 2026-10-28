@@ -10,6 +10,11 @@ Nạp bằng `bash lab.sh setup` (hoặc nạp lại sạch bằng `bash lab.sh 
 | D | designer@pinpoint.test | Người thiết kế | ADMIN (quản lý, người tạo) | ADMIN (quản lý, người tạo) |
 | R | reviewer@pinpoint.test | Giảng viên / người duyệt | COMMENT (góp ý) | COMMENT (góp ý) |
 | V | viewer@pinpoint.test | Thành viên chỉ xem | VIEW (chỉ xem) | **không thuộc dự án** |
+| S | hotro@pinpoint.test | **Bộ phận hỗ trợ** (`is_support`, bản 2.2) | không thuộc dự án | không thuộc dự án |
+| Q | admin@pinpoint.test | **Quản trị hệ thống** (`is_admin`, bản 2.3) — xem mọi dự án ở menu Quản trị | không thuộc dự án | không thuộc dự án |
+
+Yêu cầu hỗ trợ mẫu (bản 2.2): #1 của V (Tài khoản, **Đã trả lời** bởi S) và #2 của R (Góp ý tính năng, **Đang chờ**) — đăng nhập S,
+mở menu **Xử lý yêu cầu** để trả lời #2.
 
 ## Màn hình và phiên bản (2 dự án × 3 màn hình × 2 phiên bản = 12 ảnh)
 

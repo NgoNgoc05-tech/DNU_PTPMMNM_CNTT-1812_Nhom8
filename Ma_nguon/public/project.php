@@ -11,6 +11,7 @@ $projects = new ProjectRepository($c);
 $project = $projects->find($projectId);
 $screens = (new ScreenRepository($c))->listForProject($projectId);
 $members = $projects->members($projectId);
+$pending = Access::allows($role, Access::ADMIN) ? $projects->pendingInvitations($projectId) : [];
 $annotations = new AnnotationRepository($c);
 $stats = $annotations->stats($projectId);
 $activity = $annotations->activity($projectId, 8);
@@ -116,6 +117,25 @@ require __DIR__ . '/../templates/header.php';
 </li>
 <?php endforeach; ?>
 </ul>
+<?php if ($pending !== []): ?>
+<div class="block-title mt"><?= icon('clock') ?>Đang chờ xác nhận · <?= count($pending) ?></div>
+<ul class="member-list pending-list">
+<?php foreach ($pending as $pi): ?>
+<li>
+<?= avatar($pi['name'], (int) $pi['user_id']) ?>
+<div class="who"><?= e($pi['name']) ?><small><?= e($pi['email']) ?> · mời <?= e(ago($pi['created_at'])) ?></small></div>
+<span class="badge badge-muted"><?= e(Access::LABELS[$pi['role']]) ?> · chờ</span>
+<form method="post" action="/members.php" data-confirm="Huỷ lời mời gửi <?= e($pi['name']) ?>?">
+<?= csrfField() ?>
+<input type="hidden" name="project_id" value="<?= $projectId ?>">
+<input type="hidden" name="invitation_id" value="<?= (int) $pi['id'] ?>">
+<input type="hidden" name="action" value="cancel_invite">
+<button class="btn btn-subtle btn-icon btn-sm" type="submit" aria-label="Huỷ lời mời <?= e($pi['name']) ?>" title="Huỷ lời mời"><?= icon('x') ?></button>
+</form>
+</li>
+<?php endforeach; ?>
+</ul>
+<?php endif; ?>
 <?php if ($isAdmin): ?>
 <form method="post" action="/members.php" class="mt">
 <?= csrfField() ?>
@@ -127,8 +147,10 @@ require __DIR__ . '/../templates/header.php';
 <div class="grow"><select id="mrole" name="role" aria-label="Quyền khi mời">
 <option value="VIEW">Chỉ xem — xem ảnh, góp ý, xuất danh sách</option><option value="COMMENT" selected>Góp ý — tạo, trả lời, xử lý góp ý</option><option value="ADMIN">Quản lý — thêm ảnh, quản lý thành viên</option>
 </select></div>
-<button class="btn" type="submit"><?= icon('plus') ?>Mời</button>
+<button class="btn" type="submit"><?= icon('plus') ?>Gửi lời mời</button>
 </div>
+<div class="field mt-s"><input name="message" type="text" maxlength="300" placeholder="Lời nhắn kèm theo (không bắt buộc)" aria-label="Lời nhắn kèm lời mời"></div>
+<p class="hint">Người được mời nhận thông báo và phải bấm <strong>Chấp nhận</strong> mới trở thành thành viên.</p>
 </form>
 <?php endif; ?>
 </div>

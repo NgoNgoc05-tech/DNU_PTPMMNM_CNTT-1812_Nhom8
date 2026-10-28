@@ -32,10 +32,10 @@ final class AnnotationRepository
      * Tạo dấu + nhận xét gốc + dòng lịch sử "mở" trong một giao dịch.
      * $meta (không bắt buộc): priority, category, assignee_id, due_date.
      */
-    public function create(int $versionId, string $shape, mixed $x, mixed $y, mixed $w, mixed $h, string $body, int $userId, array $meta = []): array
+    public function create(int $versionId, string $shape, mixed $x, mixed $y, mixed $w, mixed $h, string $body, int $userId, array $meta = [], mixed $points = null): array
     {
         $body = cleanBody($body);
-        return transaction($this->c, function () use ($versionId, $shape, $x, $y, $w, $h, $body, $userId, $meta): array {
+        return transaction($this->c, function () use ($versionId, $shape, $x, $y, $w, $h, $body, $userId, $meta, $points): array {
             // Khoá phiên bản ảnh để hai người tạo dấu cùng lúc không trùng số thứ tự.
             $version = fetchOne($this->c,
                 'SELECT v.id, v.width, v.height, s.project_id FROM image_versions v JOIN screens s ON s.id = v.screen_id
@@ -43,15 +43,16 @@ final class AnnotationRepository
             if ($version === null) {
                 throw new AppError('NOT_FOUND', 404);
             }
-            $pos = Coordinates::validate($shape, $x, $y, $w, $h, (int) $version['width'], (int) $version['height']);
+            $pos = Coordinates::validate($shape, $x, $y, $w, $h, (int) $version['width'], (int) $version['height'], $points);
             $m = $this->cleanMeta($meta, (int) $version['project_id']);
             $row = fetchOne($this->c,
-                'INSERT INTO annotations (image_version_id, seq_no, shape, x, y, w, h, created_by, priority, category, assignee_id, due_date)
+                'INSERT INTO annotations (image_version_id, seq_no, shape, x, y, w, h, created_by, priority, category, assignee_id, due_date, points)
                  VALUES ($1, (SELECT COALESCE(MAX(seq_no), 0) + 1 FROM annotations WHERE image_version_id = $1),
-                         $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                         $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
                  RETURNING id',
                 [$versionId, $pos['shape'], $pos['x'], $pos['y'], $pos['w'], $pos['h'], $userId,
-                 $m['priority'] ?? 'MEDIUM', $m['category'] ?? 'OTHER', $m['assignee_id'] ?? null, $m['due_date'] ?? null]);
+                 $m['priority'] ?? 'MEDIUM', $m['category'] ?? 'OTHER', $m['assignee_id'] ?? null, $m['due_date'] ?? null,
+                 $pos['points'] === null ? null : json_encode($pos['points'])]);
             $annotationId = (int) $row['id'];
             queryParams($this->c, 'INSERT INTO comments (annotation_id, author_id, body) VALUES ($1, $2, $3)',
                 [$annotationId, $userId, $body]);
@@ -410,7 +411,7 @@ final class AnnotationRepository
             'priority' => self::PRIORITIES[$value] ?? (string) $value,
             'category' => self::CATEGORIES[$value] ?? (string) $value,
             'assignee_id' => (string) (fetchOne($this->c, 'SELECT name FROM users WHERE id = $1', [(int) $value])['name'] ?? ''),
-            'due_date' => date('d/m/Y', (int) strtotime((string) $value)),
+            'due_date' => date('m/d/Y', (int) strtotime((string) $value)),
             'note' => mb_substr((string) $value, 0, 200),
             default => (string) $value,
         };
@@ -463,7 +464,7 @@ final class AnnotationRepository
     private function query(string $where, array $params, bool $withThread = true, int $viewerId = 0, string $order = 's.id, v.version_no, a.seq_no'): array
     {
         $rows = fetchAll($this->c,
-            "SELECT a.id, a.image_version_id, a.seq_no, a.shape, a.x, a.y, a.w, a.h, a.status, a.lock_version,
+            "SELECT a.id, a.image_version_id, a.seq_no, a.shape, a.x, a.y, a.w, a.h, a.points, a.status, a.lock_version,
                     a.created_at, a.updated_at, a.created_by, u.name AS author,
                     a.priority, a.category, a.assignee_id, asg.name AS assignee, a.due_date,
                     (a.status = 'OPEN' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE) AS overdue,
@@ -512,6 +513,7 @@ final class AnnotationRepository
         $revCount = array_column($rootRevisions, 'n', 'comment_id');
         $commentIds = array_merge(array_column($items, 'comment_id'), array_map(fn ($r) => (int) $r['id'], $replies));
         $reactions = $this->reactionsFor($commentIds, $viewerId);
+        $files = (new AttachmentRepository($this->c))->forComments($commentIds);
         $byId = [];
         foreach ($items as $i => $item) {
             $items[$i]['replies'] = [];
@@ -519,6 +521,7 @@ final class AnnotationRepository
             $items[$i]['events'] = [];
             $items[$i]['comment_revisions'] = (int) ($revCount[$item['comment_id']] ?? 0);
             $items[$i]['reactions'] = $reactions[$item['comment_id']] ?? [];
+            $items[$i]['attachments'] = $files[$item['comment_id']] ?? [];
             $byId[$item['id']] = $i;
         }
         foreach ($replies as $r) {
@@ -526,6 +529,7 @@ final class AnnotationRepository
                 'id' => (int) $r['id'], 'body' => $r['body'], 'author' => $r['author'], 'author_id' => (int) $r['author_id'],
                 'lock_version' => (int) $r['lock_version'], 'created_at' => $r['created_at'],
                 'edited' => (int) $r['revisions'] > 0, 'reactions' => $reactions[(int) $r['id']] ?? [],
+                'attachments' => $files[(int) $r['id']] ?? [],
             ];
         }
         foreach ($history as $h) {
@@ -586,6 +590,7 @@ final class AnnotationRepository
             'y' => (float) $r['y'],
             'w' => $r['w'] === null ? null : (float) $r['w'],
             'h' => $r['h'] === null ? null : (float) $r['h'],
+            'points' => $r['points'] === null ? null : json_decode($r['points'], true),
             'status' => $r['status'],
             'lock_version' => (int) $r['lock_version'],
             'author' => $r['author'],

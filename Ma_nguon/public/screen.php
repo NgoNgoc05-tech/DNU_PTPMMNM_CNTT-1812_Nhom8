@@ -101,6 +101,8 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" data-tool="pan" aria-pressed="false" aria-label="Chọn và kéo ảnh"><?= icon('hand') ?><span class="tip">Chọn / kéo<kbd>V</kbd></span></button>
 <button type="button" data-tool="point" aria-pressed="true" aria-label="Đặt điểm"><?= icon('pin') ?>Điểm<span class="tip">Đặt điểm góp ý<kbd>C</kbd></span></button>
 <button type="button" data-tool="rect" aria-pressed="false" aria-label="Khoanh vùng"><?= icon('square') ?>Vùng<span class="tip">Khoanh vùng chữ nhật<kbd>R</kbd></span></button>
+<button type="button" data-tool="arrow" aria-pressed="false" aria-label="Vẽ mũi tên"><?= icon('arrow-tool') ?>Mũi tên<span class="tip">Kéo từ đuôi tới đầu mũi tên<kbd>A</kbd></span></button>
+<button type="button" data-tool="draw" aria-pressed="false" aria-label="Vẽ tay"><?= icon('pen') ?>Vẽ tay<span class="tip">Giữ chuột và vẽ tự do<kbd>D</kbd></span></button>
 </div>
 <span class="sep"></span>
 <?php endif; ?>
@@ -201,7 +203,7 @@ require __DIR__ . '/../templates/header.php';
 <dialog class="modal" id="dlg-keys" aria-labelledby="dlg-keys-title">
 <div class="modal-head"><h2 id="dlg-keys-title">Phím tắt</h2><button type="button" class="btn btn-subtle btn-icon btn-sm" data-close aria-label="Đóng"><?= icon('x') ?></button></div>
 <div class="modal-body shortcuts">
-<?php if ($canComment): ?><span><kbd>C</kbd> / <kbd>P</kbd></span><span>Đặt điểm góp ý</span><span><kbd>R</kbd></span><span>Khoanh vùng chữ nhật</span><?php endif; ?>
+<?php if ($canComment): ?><span><kbd>C</kbd> / <kbd>P</kbd></span><span>Đặt điểm góp ý</span><span><kbd>R</kbd></span><span>Khoanh vùng chữ nhật</span><span><kbd>A</kbd></span><span>Vẽ mũi tên (kéo từ đuôi tới đầu)</span><span><kbd>D</kbd></span><span>Vẽ tay tự do</span><?php endif; ?>
 <span><kbd>V</kbd> / <kbd>H</kbd></span><span>Chọn và kéo ảnh (giữ <kbd>Shift</kbd> hoặc chuột giữa để kéo tạm thời)</span>
 <span><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></span><span>Phóng to, thu nhỏ, vừa khung (cuộn chuột để phóng quanh con trỏ)</span>
 <span><kbd>←</kbd> <kbd>→</kbd> / <kbd>J</kbd> <kbd>K</kbd></span><span>Góp ý trước / sau</span>

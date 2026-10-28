@@ -50,7 +50,7 @@ case "${1:-help}" in
     php tests/run.php || status=1
     echo '== Kiểm thử JavaScript toạ độ'
     if command -v node >/dev/null 2>&1; then
-      node --test tests/js/coords.test.mjs || status=1
+      node --test tests/js/coords.test.mjs tests/js/drawing.test.mjs || status=1
     else
       echo 'NOT_RUN: chưa có Node.js (sudo apt install nodejs). Không tính là đạt.'; status=1
     fi

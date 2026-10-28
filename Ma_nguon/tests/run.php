@@ -47,6 +47,19 @@ throwsCode(fn () => Coordinates::validate('RECT', 900, 50, 200, 50, 1000, 500), 
 throwsCode(fn () => Coordinates::validate('RECT', 10, 10, 1, 50, 1000, 500), 'RECT_TOO_SMALL', 'rect-too-small');
 throwsCode(fn () => Coordinates::validate('CIRCLE', 10, 10, 5, 5, 1000, 500), 'SHAPE_INVALID', 'shape-invalid');
 
+echo "-- Bản 2.3: mũi tên và nét vẽ tay (toạ độ ảnh gốc, kiểm tra ở máy chủ)\n";
+$arrow = Coordinates::validate('ARROW', null, null, null, null, 1000, 500, [[100, 100], ['400.25', 300]]);
+same([$arrow['x'], $arrow['y'], $arrow['w'], $arrow['points']], [100.0, 100.0, null, [[100.0, 100.0], [400.3, 300.0]]], 'arrow-valid-first-point-is-anchor');
+throwsCode(fn () => Coordinates::validate('ARROW', 0, 0, null, null, 1000, 500, [[1, 1], [50, 50], [90, 90]]), 'SHAPE_INVALID', 'arrow-needs-exactly-2-points');
+throwsCode(fn () => Coordinates::validate('ARROW', 0, 0, null, null, 1000, 500, [[10, 10], [1001, 10]]), 'POSITION_OUTSIDE_IMAGE', 'arrow-end-outside-image');
+throwsCode(fn () => Coordinates::validate('ARROW', 0, 0, null, null, 1000, 500, [[10, 10], [13, 13]]), 'STROKE_TOO_SHORT', 'arrow-too-short');
+$draw = Coordinates::validate('DRAW', 0, 0, null, null, 1000, 500, [[10, 10], [20, 15], [30, 10], [40, 18]]);
+same([$draw['shape'], count($draw['points'])], ['DRAW', 4], 'draw-valid');
+throwsCode(fn () => Coordinates::validate('DRAW', 0, 0, null, null, 1000, 500, array_fill(0, 501, [5, 5])), 'SHAPE_INVALID', 'draw-max-500-points');
+throwsCode(fn () => Coordinates::validate('DRAW', 0, 0, null, null, 1000, 500, [[10, 10], ['x' => 5, 'y' => 6]]), 'POSITION_OUTSIDE_IMAGE', 'draw-point-must-be-pair');
+throwsCode(fn () => Coordinates::validate('DRAW', 0, 0, null, null, 1000, 500, '[[1,1],[50,50]]'), 'SHAPE_INVALID', 'draw-points-must-be-list');
+same(Coordinates::SHAPES['ARROW'], 'Mũi tên', 'shape-label-arrow');
+
 echo "-- Nội dung nhận xét là dữ liệu, không phải mã\n";
 same(e('<script>alert("x")</script>'), '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;', 'html-escaped');
 same(cleanBody("  Nút  \r\nhơi to "), "Nút  \nhơi to", 'body-trimmed');
@@ -80,6 +93,9 @@ same(Assistant::local('thời tiết hôm nay')['topic'], '', 'assistant-unknown
 same(Assistant::local('tin tức link')['topic'] !== 'Xuất danh sách', true, 'assistant-whole-word-match');
 throwsCode(fn () => Assistant::answer(str_repeat('a', 501)), 'CHAT_INVALID', 'assistant-question-length');
 same(NotificationRepository::mentionName('Nguyễn Thu Trang (Thiết kế)'), 'Nguyễn Thu Trang', 'mention-name-without-role');
+
+same([Assistant::local('Làm sao vẽ mũi tên?')['topic'], Assistant::local('quên mật khẩu')['topic'], Assistant::local('khoá tài khoản')['topic']],
+    ['Mũi tên, vẽ tay và ảnh đính kèm', 'Hồ sơ và mật khẩu', 'Quản trị hệ thống'], 'assistant-v23-topics');
 
 echo "-- Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)\n";
 $tmp = sys_get_temp_dir() . '/pinpoint-unit-' . getmypid();

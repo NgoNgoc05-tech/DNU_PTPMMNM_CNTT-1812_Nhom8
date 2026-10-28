@@ -12,7 +12,7 @@ final class Export
     public const HEADER = [
         'Màn hình', 'Phiên bản', 'Số thứ tự', 'Kiểu dấu', 'X (px ảnh gốc)', 'Y (px ảnh gốc)',
         'Rộng (px)', 'Cao (px)', 'Kích thước ảnh', 'Trạng thái', 'Người viết', 'Nội dung', 'Số trả lời', 'Thời điểm tạo',
-        'Ưu tiên', 'Nhãn', 'Người phụ trách', 'Hạn xử lý', 'Quá hạn', 'Ghi chú xử lý', 'Kiểm tra sau sửa trên', 'Bản mới nhất',
+        'Ưu tiên', 'Nhãn', 'Người phụ trách', 'Hạn xử lý (tháng/ngày/năm)', 'Quá hạn', 'Ghi chú xử lý', 'Kiểm tra sau sửa trên', 'Bản mới nhất',
     ];
 
     public static function rows(array $items): array
@@ -23,7 +23,7 @@ final class Export
                 $a['screen_name'],
                 'v' . $a['version_no'],
                 '#' . $a['seq_no'],
-                $a['shape'] === 'POINT' ? 'Điểm' : 'Vùng',
+                Coordinates::SHAPES[$a['shape']] ?? $a['shape'],
                 self::num($a['x']),
                 self::num($a['y']),
                 $a['w'] === null ? '' : self::num($a['w']),
@@ -37,7 +37,7 @@ final class Export
                 AnnotationRepository::PRIORITIES[$a['priority'] ?? 'MEDIUM'] ?? '',
                 AnnotationRepository::CATEGORIES[$a['category'] ?? 'OTHER'] ?? '',
                 (string) ($a['assignee'] ?? ''),
-                empty($a['due_date']) ? '' : date('d/m/Y', (int) strtotime((string) $a['due_date'])),
+                empty($a['due_date']) ? '' : date('m/d/Y', (int) strtotime((string) $a['due_date'])),
                 !empty($a['overdue']) ? 'Có' : '',
                 (string) ($a['note'] ?? ''),
                 empty($a['resolved_on_version_no']) ? '' : 'v' . $a['resolved_on_version_no'],

@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 // Bàn làm việc của bộ phận hỗ trợ (bản 2.2): xem mọi yêu cầu hỗ trợ, trả lời và đổi trạng thái.
-// Chỉ tài khoản có users.is_support = true (mẫu: hotro@pinpoint.test) mới vào được.
+// Chỉ tài khoản bộ phận hỗ trợ (users.is_support, mẫu: hotro@pinpoint.test) hoặc quản trị viên mới vào được.
 require __DIR__ . '/../src/web.php';
 $c = db();
 $user = Auth::requireUser($c);
-if (($user['is_support'] ?? 'f') !== 't') {
+if (($user['is_support'] ?? 'f') !== 't' && ($user['is_admin'] ?? 'f') !== 't') {
     throw new AppError('FORBIDDEN', 403);
 }
 $support = new SupportRepository($c);
@@ -20,6 +20,19 @@ if (isPost()) {
     checkCsrf($_POST);
     $tid = intField($_POST, 'id');
     try {
+        if (field($_POST, 'action') === 'reset_link') {
+            // Bản 2.3: cấp link đặt lại mật khẩu cho người gửi yêu cầu "Quên mật khẩu".
+            $t = fetchOne($c, 'SELECT user_id FROM support_tickets WHERE id = $1 AND is_password_reset', [$tid]);
+            if ($t === null) {
+                throw new AppError('NOT_FOUND', 404);
+            }
+            $link = PasswordReset::link(PasswordReset::issue($c, (int) $t['user_id'], (int) $user['id']));
+            $support->answer($tid, 'Bộ phận hỗ trợ đã cấp link đặt lại mật khẩu lúc ' . date('H:i d/m/Y') . ' (hiệu lực '
+                . PasswordReset::TTL_MINUTES . ' phút) và gửi qua cách liên hệ bạn đã ghi.', 'ANSWERED', (int) $user['id']);
+            $_SESSION['issued_link'] = ['ticket' => $tid, 'link' => $link];
+            // Yêu cầu đã chuyển sang "Đã trả lời": mở mục Tất cả để vẫn thấy link vừa cấp.
+            redirect('/support_admin.php?status=#t' . $tid);
+        }
         $status = field($_POST, 'status');
         $support->answer($tid, (string) ($_POST['reply'] ?? ''), $status, (int) $user['id']);
         flash('Đã cập nhật yêu cầu #' . $tid . ($status === 'ANSWERED' ? ' — người gửi đã nhận được thông báo.' : '.'));
@@ -28,6 +41,8 @@ if (isPost()) {
         $error = errorMessage($ex->errorCode);
     }
 }
+$issued = $_SESSION['issued_link'] ?? null;
+unset($_SESSION['issued_link']);
 $counts = $support->counts();
 $tickets = $support->listAll($filter);
 $title = 'Bộ phận hỗ trợ';
@@ -67,6 +82,19 @@ require __DIR__ . '/../templates/header.php';
 <span class="badge <?= $t['status'] === 'ANSWERED' ? 'badge-resolved' : ($t['status'] === 'OPEN' ? 'badge-open' : 'badge-muted') ?>"><?= e(SupportRepository::STATUSES[$t['status']]) ?></span>
 </div>
 <p class="pre ticket-message"><?= e($t['message']) ?></p>
+<?php if ($t['is_password_reset'] === 't'): ?>
+<div class="reset-box">
+<?php if ($issued !== null && (int) $issued['ticket'] === (int) $t['id']): ?>
+<div class="flash warn" role="status"><?= icon('key') ?><span>Link chỉ hiện <strong>một lần</strong>, hiệu lực <?= PasswordReset::TTL_MINUTES ?> phút. Hãy copy và gửi cho <?= e($t['user_name']) ?> qua cách liên hệ ghi trong yêu cầu.</span></div>
+<input class="issued-link" type="text" readonly value="<?= e($issued['link']) ?>" aria-label="Link đặt lại mật khẩu" data-select-all>
+<?php endif; ?>
+<form method="post" action="/support_admin.php?status=<?= e(urlencode($filter)) ?>">
+<?= csrfField() ?><input type="hidden" name="id" value="<?= (int) $t['id'] ?>"><input type="hidden" name="action" value="reset_link">
+<button class="btn btn-sm btn-ghost" type="submit"><?= icon('key') ?><?= $issued !== null && (int) $issued['ticket'] === (int) $t['id'] ? 'Cấp link khác' : 'Cấp link đặt lại mật khẩu (30 phút)' ?></button>
+<span class="hint">Cấp link mới làm link cũ hết hiệu lực.</span>
+</form>
+</div>
+<?php endif; ?>
 <form method="post" action="/support_admin.php?status=<?= e(urlencode($filter)) ?>" class="ticket-answer">
 <?= csrfField() ?>
 <input type="hidden" name="id" value="<?= (int) $t['id'] ?>">

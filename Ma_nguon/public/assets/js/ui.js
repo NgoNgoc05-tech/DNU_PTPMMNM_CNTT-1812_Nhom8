@@ -37,6 +37,11 @@
   document.querySelectorAll('select[data-autosubmit]').forEach(function (el) {
     el.addEventListener('change', function () { el.form.submit(); });
   });
+  // Ô chỉ đọc chứa link (ví dụ link đặt lại mật khẩu): bấm vào là chọn hết để copy.
+  document.querySelectorAll('input[data-select-all]').forEach(function (el) {
+    el.addEventListener('focus', function () { el.select(); });
+    el.addEventListener('click', function () { el.select(); });
+  });
   document.querySelectorAll('form[data-confirm]').forEach(function (form) {
     form.addEventListener('submit', function (e) { if (!window.confirm(form.dataset.confirm)) { e.preventDefault(); } });
   });

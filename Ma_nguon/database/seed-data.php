@@ -18,6 +18,16 @@ return [
         'R' => ['email' => 'reviewer@pinpoint.test', 'name' => 'Lê Minh Đức (Giảng viên)'],
         'V' => ['email' => 'viewer@pinpoint.test', 'name' => 'Phạm Gia Huy (Thành viên)'],
     ],
+    // Tài khoản bộ phận hỗ trợ (bản 2.2): không thuộc dự án nào, chỉ xử lý yêu cầu ở trang Hỗ trợ.
+    'support' => ['email' => 'hotro@pinpoint.test', 'name' => 'Bộ phận hỗ trợ Pinpoint'],
+    // Quản trị hệ thống (bản 2.3): quản lý người dùng, mọi dự án, thống kê toàn hệ thống. ĐỔI MẬT KHẨU khi dùng thật.
+    'admin' => ['email' => 'admin@pinpoint.test', 'name' => 'Quản trị hệ thống'],
+    // Yêu cầu hỗ trợ mẫu: [người gửi, loại, tiêu đề, nội dung, trả lời ('' = đang chờ)]
+    'tickets' => [
+        ['V', 'ACCOUNT', 'Xin quyền góp ý dự án FoodNow', 'Em đang có quyền Chỉ xem, muốn góp ý thì làm thế nào ạ?',
+            'Chào bạn, quyền do Quản lý dự án cấp. Bạn nhờ chị Thu Trang đổi quyền sang Góp ý trong khung Thành viên nhé.'],
+        ['R', 'IDEA', 'Thêm xuất PDF có ảnh', 'Mong có thể xuất danh sách góp ý kèm ảnh chụp từng vị trí.', ''],
+    ],
     'projects' => [
         'A' => [
             'name' => 'FoodNow – Ứng dụng đặt món',

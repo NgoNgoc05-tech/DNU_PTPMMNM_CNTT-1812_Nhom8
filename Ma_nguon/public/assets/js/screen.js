@@ -20,6 +20,7 @@
     onSelect: function (id) { select(id, false); },
     onDraft: function (pos) { closePopover(); view.select(null); panel.select(null); openPopover(pos); },
     onOutside: function () { Pin.toast('Bấm vào bên trong ảnh; phần lề trống không được tính.', true); },
+    onTooShort: function (mode) { Pin.toast(mode === 'arrow' ? 'Kéo từ đuôi tới đầu mũi tên (dài ít nhất 8 px ảnh gốc).' : 'Giữ chuột và kéo để vẽ nét.', true); },
     onLayout: function (v) { zoomLabel.textContent = Math.round(v.content().scale * 100) + '%'; placePopover(); },
     onHover: function (pt) {
       cursorInfo.textContent = pt && pt.inside
@@ -160,7 +161,7 @@
   }
   function describe(ev) {
     switch (ev.kind) {
-      case 'CREATED': return 'tạo góp ý ' + (ev.new_value === 'RECT' ? 'vùng' : 'điểm');
+      case 'CREATED': return 'tạo góp ý ' + ({ RECT: 'vùng', ARROW: 'mũi tên', DRAW: 'vẽ tay' }[ev.new_value] || 'điểm');
       case 'REPLIED': return 'trả lời';
       case 'EDITED': return 'sửa nhận xét';
       case 'STATUS': return ev.new_value === 'RESOLVED' ? 'đánh dấu đã xử lý (' + ev.detail.split(' — ')[0] + ')' : 'mở lại';
@@ -206,6 +207,8 @@
     else if (k === '0') { view.fit(); }
     else if (cfg.canComment && /^[pPcC]$/.test(k)) { setTool('point'); }
     else if (cfg.canComment && (k === 'r' || k === 'R')) { setTool('rect'); }
+    else if (cfg.canComment && (k === 'a' || k === 'A')) { setTool('arrow'); }
+    else if (cfg.canComment && (k === 'd' || k === 'D')) { setTool('draw'); }
     else if (/^[hHvV]$/.test(k)) { setTool('pan'); }
     else if (k === 'm' || k === 'M') { toggle('hideMarks'); }
     else if (k === '/') { e.preventDefault(); showTab('list'); if (panel.selectedId) { select(null, false); } document.getElementById('f-q').focus(); }
@@ -216,6 +219,11 @@
     else if (k === 'Escape') { if (popover) { closePopover(); view.setDraft(null); } else { select(null, false); } }
     else { return; }
     e.preventDefault();
+  });
+
+  // Bản 2.3: có trả lời / @nhắc tên mới trên đúng phiên bản đang xem -> tự tải lại danh sách, giữ góp ý đang mở.
+  window.addEventListener('pinpoint:notifications', function (e) {
+    if ((e.detail || []).some(function (n) { return n.version_id === cfg.versionId; }) && !popover) { load(panel.selectedId || null); }
   });
 
   window.pinpointView = view; // dùng cho kiểm thử trên trình duyệt

@@ -11,10 +11,14 @@ if (!preg_match('#^/[A-Za-z0-9_\-./?=&%]*$#', $next) || str_starts_with($next, '
 }
 if (isPost()) {
     checkCsrf($_POST);
-    if (Auth::attempt(db(), field($_POST, 'email'), (string) ($_POST['password'] ?? '')) !== null) {
-        redirect($next);
+    try {
+        if (Auth::attempt(db(), field($_POST, 'email'), (string) ($_POST['password'] ?? '')) !== null) {
+            redirect($next);
+        }
+        $error = 'Email hoặc mật khẩu không đúng.';
+    } catch (AppError $ex) {
+        $error = errorMessage($ex->errorCode);
     }
-    $error = 'Email hoặc mật khẩu không đúng.';
 }
 $title = 'Đăng nhập';
 $user = null;
@@ -47,7 +51,7 @@ require __DIR__ . '/../templates/header.php';
 <form method="post" action="/login.php?next=<?= e(rawurlencode($next)) ?>">
 <?= csrfField() ?>
 <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required autocomplete="username" value="<?= e(field($_POST, 'email')) ?>" placeholder="ban@truong.edu.vn"></div>
-<div class="field"><label for="password">Mật khẩu</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+<div class="field"><div class="label-row"><label for="password">Mật khẩu</label><a class="hint" href="/forgot.php">Quên mật khẩu?</a></div><input id="password" name="password" type="password" required autocomplete="current-password"></div>
 <button class="btn btn-block" type="submit">Đăng nhập</button>
 </form>
 <p class="hint mt">Chưa có tài khoản? <a href="/register.php">Tạo tài khoản</a></p>
@@ -57,6 +61,8 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" data-demo-email="designer@pinpoint.test"><?= avatar('Nguyễn Thu Trang', 0) ?><span><strong>designer@pinpoint.test</strong><small>Người thiết kế · Quản lý cả hai dự án</small></span></button>
 <button type="button" data-demo-email="reviewer@pinpoint.test"><?= avatar('Lê Minh Đức', 1) ?><span><strong>reviewer@pinpoint.test</strong><small>Giảng viên · quyền Góp ý</small></span></button>
 <button type="button" data-demo-email="viewer@pinpoint.test"><?= avatar('Phạm Gia Huy', 2) ?><span><strong>viewer@pinpoint.test</strong><small>Thành viên · Chỉ xem dự án A</small></span></button>
+<button type="button" data-demo-email="hotro@pinpoint.test"><?= avatar('Bộ phận hỗ trợ Pinpoint', 3) ?><span><strong>hotro@pinpoint.test</strong><small>Bộ phận hỗ trợ · trả lời yêu cầu</small></span></button>
+<button type="button" data-demo-email="admin@pinpoint.test"><?= avatar('Quản trị hệ thống', 4) ?><span><strong>admin@pinpoint.test</strong><small>Quản trị hệ thống · quản lý toàn bộ dữ liệu</small></span></button>
 </div>
 </div>
 </div>

@@ -66,13 +66,34 @@ final class Seeder
                 }
                 $annotations[] = $a['id'];
             }
+            // Bộ phận hỗ trợ và yêu cầu hỗ trợ mẫu (bản 2.2)
+            $supportId = null;
+            if (isset($data['support'])) {
+                $semail = $emailSuffix === '' ? $data['support']['email'] : str_replace('@', '+' . $emailSuffix . '@', $data['support']['email']);
+                $supportId = Auth::createUser($c, $semail, $data['support']['name'], $data['password']);
+                queryParams($c, 'UPDATE users SET is_support = true WHERE id = $1', [$supportId]);
+                $support = new SupportRepository($c);
+                foreach ($data['tickets'] ?? [] as [$uk, $cat, $subject, $message, $reply]) {
+                    $tid = $support->create($users[$uk], $cat, $subject, $message);
+                    if ($reply !== '') {
+                        $support->answer($tid, $reply, 'ANSWERED', $supportId);
+                    }
+                }
+            }
+            // Quản trị hệ thống (bản 2.3)
+            $adminId = null;
+            if (isset($data['admin'])) {
+                $aemail = $emailSuffix === '' ? $data['admin']['email'] : str_replace('@', '+' . $emailSuffix . '@', $data['admin']['email']);
+                $adminId = Auth::createUser($c, $aemail, $data['admin']['name'], $data['password']);
+                queryParams($c, 'UPDATE users SET is_admin = true WHERE id = $1', [$adminId]);
+            }
             // Thông báo sinh ra khi nạp dữ liệu: chỉ để 3 thông báo mới nhất của mỗi người ở trạng thái chưa đọc.
             queryParams($c,
                 'UPDATE notifications SET read_at = now() WHERE user_id = ANY($1::bigint[]) AND id NOT IN (
                    SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY user_id ORDER BY id DESC) AS rn
                                      FROM notifications WHERE user_id = ANY($1::bigint[])) t WHERE rn <= 3)',
-                ['{' . implode(',', $users) . '}']);
-            return ['users' => $users, 'projects' => $projects, 'versions' => $versions, 'annotations' => $annotations];
+                ['{' . implode(',', array_merge(array_values($users), $supportId !== null ? [$supportId] : [])) . '}']);
+            return ['users' => $users, 'support' => $supportId, 'admin' => $adminId, 'projects' => $projects, 'versions' => $versions, 'annotations' => $annotations];
         });
     }
 }

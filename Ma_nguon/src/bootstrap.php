@@ -17,6 +17,9 @@ require_once __DIR__ . '/AnnotationRepository.php';
 require_once __DIR__ . '/NotificationRepository.php';
 require_once __DIR__ . '/SupportRepository.php';
 require_once __DIR__ . '/Assistant.php';
+require_once __DIR__ . '/AttachmentRepository.php';
+require_once __DIR__ . '/PasswordReset.php';
+require_once __DIR__ . '/AdminRepository.php';
 require_once __DIR__ . '/Export.php';
 require_once __DIR__ . '/Seeder.php';
 
@@ -58,6 +61,14 @@ function errorMessage(string $code): string
         'PASSWORD_MISMATCH' => 'Hai mật khẩu mới không khớp.',
         'TICKET_INVALID' => 'Hãy nhập tiêu đề (≤ 150 ký tự) và nội dung (≤ 4000 ký tự).',
         'CHAT_INVALID' => 'Câu hỏi phải từ 1 đến 500 ký tự.',
+        'INVITATION_NOT_FOUND' => 'Lời mời không còn hiệu lực (đã được trả lời hoặc đã bị huỷ).',
+        'STROKE_TOO_SHORT' => 'Mũi tên / nét vẽ quá ngắn (cần dài ít nhất 8 px ảnh gốc).',
+        'ATTACHMENT_LIMIT' => 'Mỗi nhận xét đính kèm tối đa 4 ảnh.',
+        'RESET_TOKEN_INVALID' => 'Đường link đặt lại mật khẩu không đúng, đã dùng hoặc đã quá 30 phút. Hãy yêu cầu link mới.',
+        'ACCOUNT_LOCKED' => 'Tài khoản này đang bị khoá. Hãy liên hệ quản trị viên.',
+        'CANNOT_CHANGE_SELF' => 'Không thể tự khoá hoặc tự bỏ quyền quản trị của chính mình.',
+        'LAST_ADMIN' => 'Hệ thống cần ít nhất một quản trị viên.',
+        'UNAUTHENTICATED' => 'Phiên đăng nhập đã hết. Hãy đăng nhập lại.',
     ][$code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
