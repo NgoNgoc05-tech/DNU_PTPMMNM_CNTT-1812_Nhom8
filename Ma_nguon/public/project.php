@@ -16,6 +16,8 @@ $annotations = new AnnotationRepository($c);
 $stats = $annotations->stats($projectId);
 $activity = $annotations->activity($projectId, 8);
 $isAdmin = Access::allows($role, Access::ADMIN);
+$archived = $project['archived_at'] !== null;
+$canRestore = $archived && Access::roleFor($c, $user['id'], $projectId) === Access::ADMIN;
 $title = $project['name'];
 $active = 'projects';
 $issues = '/issues.php?project=' . $projectId;
@@ -24,7 +26,7 @@ require __DIR__ . '/../templates/header.php';
 <div class="page-head">
 <div>
 <div class="crumbs"><a href="/projects.php">Dự án</a><span class="sep">/</span><span><?= e($project['name']) ?></span></div>
-<h1><?= e($project['name']) ?></h1>
+<h1><?= e($project['name']) ?><?php if ($archived): ?> <span class="badge badge-muted"><?= icon('archive', 'sm') ?>Đã lưu trữ</span><?php endif; ?></h1>
 <p><?= e($project['description'] !== '' ? $project['description'] : 'Chưa có mô tả.') ?></p>
 </div>
 <div class="actions">
@@ -38,6 +40,12 @@ require __DIR__ . '/../templates/header.php';
 </div>
 </div>
 
+<?php if ($archived): ?>
+<div class="flash warn archived-banner" role="status"><?= icon('archive') ?><span>Dự án đã được lưu trữ <?= e(ago($project['archived_at'])) ?> nên <strong>chỉ xem</strong>: không tạo, trả lời hay đổi trạng thái góp ý. Dữ liệu, ảnh và lịch sử vẫn giữ nguyên.</span>
+<?php if ($canRestore): ?><form method="post" action="/project_edit.php"><?= csrfField() ?><input type="hidden" name="project_id" value="<?= $projectId ?>"><input type="hidden" name="action" value="unarchive">
+<button class="btn btn-sm" type="submit"><?= icon('undo', 'sm') ?>Khôi phục dự án</button></form><?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="grid grid-4">
 <a class="stat" href="<?= $issues ?>&amp;status=OPEN"><span class="stat-icon pin"><?= icon('pin') ?></span><span><strong><?= $stats['open'] ?></strong><span>Chưa xử lý</span></span></a>
 <a class="stat" href="<?= $issues ?>&amp;status=RESOLVED"><span class="stat-icon ok"><?= icon('check-circle') ?></span><span><strong><?= $stats['resolved'] ?></strong><span>Đã xử lý · <?= $stats['progress'] ?>%</span></span></a>
@@ -197,6 +205,14 @@ require __DIR__ . '/../templates/header.php';
 <div class="field"><label for="pdesc">Mô tả</label><textarea id="pdesc" name="description" maxlength="2000"><?= e($project['description']) ?></textarea></div>
 </div>
 <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close>Huỷ</button><button class="btn" type="submit">Lưu</button></div>
+</form>
+<form method="post" action="/project_edit.php" class="archive-zone">
+<?= csrfField() ?>
+<input type="hidden" name="project_id" value="<?= $projectId ?>">
+<input type="hidden" name="action" value="archive">
+<h3><?= icon('archive') ?>Lưu trữ dự án</h3>
+<p class="hint">Dự án đã xong? Lưu trữ để ẩn khỏi danh sách chính. Mọi người vẫn xem được (chỉ xem), có thể khôi phục bất cứ lúc nào.</p>
+<button class="btn btn-ghost" type="submit" data-confirm="Lưu trữ dự án “<?= e($project['name']) ?>”? Dự án sẽ chuyển sang chỉ xem cho đến khi khôi phục."><?= icon('archive') ?>Lưu trữ dự án</button>
 </form>
 <?php if ((int) $project['created_by'] === $user['id']): ?>
 <form method="post" action="/delete.php" class="danger-zone">

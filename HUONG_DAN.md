@@ -71,10 +71,10 @@ bash lab.sh test
 
 | Phần | Tệp | Kết quả cần có |
 |---|---|---|
-| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=66 FAILED=0` |
+| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=73 FAILED=0` |
 | JavaScript: toạ độ, tô chỗ khác, rút gọn nét vẽ | tests/js/coords.test.mjs, tests/js/drawing.test.mjs | `# pass 10`, `# fail 0` |
-| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0 → 2.3 | tests/integration.php | `TESTS=160 FAILED=0` |
-| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0 → 2.3, lời mời, hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | tests/http.php | `TESTS=59 FAILED=0` |
+| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0 → 2.4 | tests/integration.php | `TESTS=180 FAILED=0` |
+| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0 → 2.4, lời mời, hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | tests/http.php | `TESTS=67 FAILED=0` |
 | Tổng | | `KET_QUA=TAT_CA_DAT` |
 
 Bộ tích hợp và bộ HTTP tự nạp một bộ dữ liệu riêng (email có hậu tố ngẫu nhiên), rồi tự xoá khi chạy xong. Dữ liệu demo không bị ảnh hưởng.
@@ -86,7 +86,7 @@ Kiểm thử trên trình duyệt thật (tuỳ chọn, cũng chạy tự độn
 npm install
 npx playwright install chromium
 bash lab.sh run          # terminal 1
-bash lab.sh e2e          # terminal 2 → TESTS=68 FAILED=0
+bash lab.sh e2e          # terminal 2 → TESTS=82 FAILED=0
 ```
 
 Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Chạy xong có thể `bash lab.sh reset` để đưa dữ liệu demo về ban đầu.
@@ -155,7 +155,20 @@ Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Ch
    Tab *Người dùng* → *Thao tác* cạnh `viewer@pinpoint.test` → **Khoá tài khoản** (ghi lý do): cửa sổ viewer bị đăng xuất ngay
    và không đăng nhập lại được; bấm **Mở khoá**. Tab *Dự án* xem mọi dự án, **Mở / can thiệp** hoặc xoá. Mọi thao tác ghi ở *Nhật ký quản trị*.
 
-**Gửi email thật cho “Quên mật khẩu” (không bắt buộc):** đặt `PINPOINT_MAIL_FROM=ban@gmail.com` (và `PINPOINT_BASE_URL=https://…onrender.com`
+### Tình huống 5 (bản 2.4) — Tìm dự án, lưu trữ, màu nét, trả lời theo luồng, nhắc hạn
+
+1. Trang **Dự án**: dòng tóm tắt có “N việc của tôi” (bằng số trên menu) và “M/T góp ý chưa xử lý”. Gõ “cổng” vào ô tìm — danh sách lọc ngay;
+   thử lọc *Tôi tạo*, *Còn góp ý chưa xử lý*, sắp xếp *Nhiều góp ý chờ nhất*.
+2. Mở một dự án → ⚙ → **Lưu trữ dự án** → hộp xác nhận hiện giữa màn hình → **Đồng ý**. Dự án hiện nhãn *Đã lưu trữ*, chỉ xem,
+   nằm ở mục **Đã lưu trữ** của trang Dự án; bấm **Khôi phục dự án** để làm tiếp.
+3. Trong khung *Thành viên* bấm × cạnh một người: hộp “Xác nhận xoá” hiện giữa màn hình (bấm Huỷ để giữ lại).
+4. Trình xem: bấm biểu tượng 🎨 trên thanh công cụ, chọn màu, rồi vẽ tay / mũi tên / khoanh vùng — nét có đúng màu đã chọn.
+5. Mở một góp ý có trao đổi, bấm **Trả lời** dưới một tin: ô soạn hiện “Trả lời …” và tự thêm @tên. Gửi xong, trả lời có trích dẫn tin gốc;
+   bấm trích dẫn để nhảy tới tin đó. @tên của chính bạn được tô vàng.
+6. **Nhắc hạn:** đặt *Hạn xử lý* là ngày mai cho một góp ý giao cho bạn → trong vòng 10 phút (hoặc chạy `php tools/reminders.php`)
+   chuông hiện “⏰ Nhắc hạn · góp ý sắp đến hạn”. Tắt/bật email nhắc hạn ở **Hồ sơ → Nhắc hạn xử lý**.
+
+**Gửi email thật cho “Quên mật khẩu” và nhắc hạn (không bắt buộc):** đặt `PINPOINT_MAIL_FROM=ban@gmail.com` (và `PINPOINT_BASE_URL=https://…onrender.com`
 trên Render) khi máy chủ đã cấu hình được hàm `mail()` của PHP. Nếu không, ứng dụng tự chuyển yêu cầu cho bộ phận hỗ trợ như bước 5.
 
 **Dùng tài khoản của bạn làm quản trị viên** (CSDL thật): `php tools/admin.php grant email-cua-ban@gmail.com` rồi đăng nhập lại.

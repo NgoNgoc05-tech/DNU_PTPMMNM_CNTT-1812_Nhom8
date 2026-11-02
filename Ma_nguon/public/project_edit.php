@@ -19,6 +19,17 @@ try {
         flash('Đã lưu thông tin dự án.');
         redirect('/project.php?id=' . $projectId);
     }
+    if ($action === 'archive' || $action === 'unarchive') {
+        $projectId = intField($_POST, 'project_id');
+        if (Access::roleFor($c, $user['id'], $projectId) === null) {
+            throw new AppError('NOT_FOUND', 404);
+        }
+        (new ProjectRepository($c))->setArchived($projectId, $user['id'], $action === 'archive');
+        flash($action === 'archive'
+            ? 'Đã lưu trữ dự án. Dự án chuyển sang mục “Đã lưu trữ” và chỉ xem; bấm Khôi phục để làm tiếp.'
+            : 'Đã khôi phục dự án.');
+        redirect('/project.php?id=' . $projectId);
+    }
     if ($action === 'screen') {
         $screenId = intField($_POST, 'screen_id');
         Access::require($c, $user['id'], Access::projectOfScreen($c, $screenId), Access::ADMIN);

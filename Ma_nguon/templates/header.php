@@ -25,16 +25,18 @@ if (!empty($user)) {
         $inviteCount = 0;
     }
     try {
+        (new NotificationRepository(db()))->remindDue(); // nhắc hạn trước 24 giờ (tối đa 10 phút quét một lần)
+    } catch (Throwable $e) {
+        error_log('Pinpoint remindDue: ' . $e->getMessage());
+    }
+    try {
         $unreadCount = (new NotificationRepository(db()))->unreadCount((int) $user['id']);
         $latestNotif = (new NotificationRepository(db()))->latestId((int) $user['id']);
     } catch (Throwable $e) {
         $unreadCount = 0;
     }
     try {
-        $myCount = (int) (fetchOne(db(),
-            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
-               JOIN project_members pm ON pm.project_id = s.project_id AND pm.user_id = $1
-              WHERE a.assignee_id = $1 AND a.status = 'OPEN'", [(int) $user['id']])['n'] ?? 0);
+        $myCount = (new AnnotationRepository(db()))->countAssigned((int) $user['id']);
     } catch (Throwable $e) {
         $myCount = 0;
     }
@@ -54,11 +56,11 @@ if (!empty($user)) {
 <a class="skip-link" href="#main">Đến nội dung chính</a>
 <header class="site-header">
 <div class="header-inner">
-<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.3</small></a>
+<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.4</small></a>
 <?php if (!empty($user)): ?>
 <nav class="main-nav" aria-label="Điều hướng chính">
 <a href="/projects.php"<?= $active === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder') ?>Dự án<?php if ($inviteCount > 0): ?> <span class="nav-count" title="Lời mời đang chờ"><?= $inviteCount ?></span><?php endif; ?></a>
-<a href="/inbox.php"<?= $active === 'inbox' ? ' aria-current="page"' : '' ?>><?= icon('inbox') ?>Việc của tôi<?php if ($myCount > 0): ?> <span class="nav-count"><?= $myCount ?></span><?php endif; ?></a>
+<a href="/inbox.php"<?= $active === 'inbox' ? ' aria-current="page"' : '' ?> title="Việc của tôi: góp ý chưa xử lý giao cho bạn phụ trách"><?= icon('inbox') ?>Việc của tôi<?php if ($myCount > 0): ?> <span class="nav-count" aria-label="<?= $myCount ?> việc giao cho bạn"><?= $myCount ?></span><?php endif; ?></a>
 <a href="/help.php"<?= $active === 'help' ? ' aria-current="page"' : '' ?>><?= icon('chat') ?>Hỗ trợ</a>
 <?php if ($isSysAdmin): ?><a href="/admin.php"<?= $active === 'admin' ? ' aria-current="page"' : '' ?>><?= icon('shield') ?>Quản trị</a><?php endif; ?>
 <?php if ($isSupport): ?><a href="/support_admin.php"<?= $active === 'support' ? ' aria-current="page"' : '' ?>><?= icon('inbox') ?>Xử lý yêu cầu<?php if ($ticketCount > 0): ?> <span class="nav-count" title="Yêu cầu đang chờ"><?= $ticketCount ?></span><?php endif; ?></a><?php endif; ?>

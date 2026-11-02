@@ -9,7 +9,7 @@ declare(strict_types=1);
  *
  * GET  ?action=list&version=ID[&status=OPEN|RESOLVED][&author=ID]
  * POST action=create   {version_id, shape: POINT|RECT|ARROW|DRAW, x, y, w, h, points[[x,y]...], body}
- * POST action=reply    {annotation_id, body}
+ * POST action=reply    {annotation_id, body, [reply_to_id]}  (bản 2.4: trả lời theo luồng)
  * POST action=edit     {comment_id, body, lock_version}
  * POST action=status   {annotation_id, to, lock_version, checked_version_id, note}
  * POST action=update   {annotation_id, lock_version, [priority], [category], [assignee_id], [due_date], [note]}
@@ -48,6 +48,7 @@ try {
         if (field($_GET, 'action') === 'notif_poll') {
             // Gọi vài giây một lần: rất nhẹ (một COUNT + tối đa 5 thông báo mới).
             $n = new NotificationRepository($c);
+            $n->remindDue();
             $after = intField($_GET, 'after');
             respond(200, ['unread' => $n->unreadCount($userId), 'latest' => $n->latestId($userId), 'items' => $after > 0 ? $n->since($userId, $after) : []]);
         }
@@ -83,14 +84,15 @@ try {
         case 'create':
             $versionId = (int) ($input['version_id'] ?? 0);
             Access::require($c, $userId, Access::projectOfVersion($c, $versionId), Access::COMMENT);
-            $meta = array_intersect_key($input, array_flip(['priority', 'category', 'assignee_id', 'due_date']));
+            $meta = array_intersect_key($input, array_flip(['priority', 'category', 'assignee_id', 'due_date', 'color']));
             $item = $repo->create($versionId, (string) ($input['shape'] ?? ''), $input['x'] ?? null, $input['y'] ?? null,
                 $input['w'] ?? null, $input['h'] ?? null, (string) ($input['body'] ?? ''), $userId, $meta, $input['points'] ?? null);
             respond(201, ['item' => $item]);
         case 'reply':
             $annotationId = (int) ($input['annotation_id'] ?? 0);
             Access::require($c, $userId, Access::projectOfAnnotation($c, $annotationId), Access::COMMENT);
-            respond(201, $repo->reply($annotationId, (string) ($input['body'] ?? ''), $userId));
+            respond(201, $repo->reply($annotationId, (string) ($input['body'] ?? ''), $userId,
+                isset($input['reply_to_id']) ? (int) $input['reply_to_id'] : null));
         case 'edit':
             $commentId = (int) ($input['comment_id'] ?? 0);
             Access::require($c, $userId, Access::projectOfComment($c, $commentId), Access::COMMENT);

@@ -14,6 +14,9 @@ if (isPost()) {
         if (field($_POST, 'action') === 'profile') {
             Auth::updateProfile($c, $user['id'], field($_POST, 'name'), field($_POST, 'title'));
             flash('Đã lưu hồ sơ.');
+        } elseif (field($_POST, 'action') === 'reminders') {
+            queryParams($c, 'UPDATE users SET email_reminders = $2 WHERE id = $1', [$user['id'], isset($_POST['email_reminders']) ? 't' : 'f']);
+            flash('Đã lưu tuỳ chọn nhắc hạn.');
         } else {
             Auth::changePassword($c, $user['id'], (string) ($_POST['current'] ?? ''), (string) ($_POST['new'] ?? ''), (string) ($_POST['repeat'] ?? ''));
             flash('Đã đổi mật khẩu.');
@@ -37,6 +40,7 @@ $stats = fetchOne($c,
 $memberships = fetchAll($c,
     'SELECT p.id, p.name, pm.role FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE pm.user_id = $1 ORDER BY p.name', [$user['id']]);
 $notes = (new NotificationRepository($c))->listFor($user['id'], 5);
+$emailReminders = (fetchOne($c, 'SELECT email_reminders FROM users WHERE id = $1', [$user['id']])['email_reminders'] ?? 't') === 't';
 $title = 'Hồ sơ của tôi';
 $active = 'profile';
 require __DIR__ . '/../templates/header.php';
@@ -85,6 +89,17 @@ require __DIR__ . '/../templates/header.php';
 <div class="grow field"><label for="prep">Nhập lại mật khẩu mới</label><input id="prep" name="repeat" type="password" required minlength="8" autocomplete="new-password"></div>
 </div>
 <button class="btn" type="submit">Đổi mật khẩu</button>
+</form>
+</div>
+<div class="card" id="reminders">
+<h2><?= icon('clock') ?>Nhắc hạn xử lý</h2>
+<p class="hint">Góp ý chưa xử lý giao cho bạn (hoặc do bạn tạo nhưng chưa giao ai) có hạn <strong>hôm nay hoặc ngày mai</strong> sẽ được nhắc một lần trong chuông 🔔.</p>
+<form method="post" action="/profile.php">
+<?= csrfField() ?>
+<input type="hidden" name="action" value="reminders">
+<label class="check"><input type="checkbox" name="email_reminders" value="1"<?= $emailReminders ? ' checked' : '' ?>> Gửi thêm email nhắc hạn tới <?= e($user['email']) ?></label>
+<p class="hint"><?= Mailer::configured() ? 'Máy chủ đã cấu hình gửi thư.' : 'Máy chủ hiện chưa cấu hình gửi thư (biến PINPOINT_MAIL_FROM), nên chỉ nhắc trong ứng dụng.' ?></p>
+<button class="btn btn-ghost" type="submit">Lưu tuỳ chọn</button>
 </form>
 </div>
 </section>

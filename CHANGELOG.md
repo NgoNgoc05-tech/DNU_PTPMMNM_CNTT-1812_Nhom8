@@ -9,6 +9,28 @@
 - Phân trang trang Tìm góp ý khi dự án có hàng nghìn góp ý.
 - Thông báo thời gian thực khi có trả lời mới.
 
+## [2.4.0] - 2026-11-02
+
+### Thêm
+- **Tìm kiếm, lọc, sắp xếp dự án** ở trang Dự án: tìm theo tên / mô tả / người tạo (lọc ngay khi gõ, Enter để tìm ở máy chủ),
+  lọc theo quyền (Tôi tạo, Quản lý, Góp ý, Chỉ xem) và tiến độ (còn góp ý chờ, đã xử lý hết, chưa có góp ý),
+  sắp xếp theo hoạt động gần nhất, nhiều góp ý chờ nhất, tên A→Z, mới tạo.
+- **Lưu trữ dự án** (nút ⚙ trong trang dự án): dự án chuyển sang mục **Đã lưu trữ**, chỉ xem — máy chủ chặn mọi thao tác ghi
+  (`PROJECT_ARCHIVED`); Quản lý bấm **Khôi phục** để làm tiếp. Dự án lưu trữ không tính vào “Việc của tôi” và không nhắc hạn.
+- **Chọn màu nét** (bảng 7 màu trên thanh công cụ) cho vùng, mũi tên và vẽ tay; màu được nhớ trên trình duyệt; đầu mũi tên cùng màu.
+- **Nhắc hạn trước 24 giờ**: góp ý chưa xử lý có hạn hôm nay / ngày mai được nhắc một lần trong chuông (“⏰ Nhắc hạn”) cho người phụ trách
+  (chưa giao ai thì người tạo); đổi hạn thì nhắc lại. Email nhắc thêm nếu máy chủ có `PINPOINT_MAIL_FROM`, tắt/bật ở **Hồ sơ → Nhắc hạn xử lý**.
+  Không cần cron (tự quét tối đa 10 phút một lần khi có người dùng); có `php tools/reminders.php` cho cron.
+- **Trao đổi theo luồng**: nút **Trả lời** trên từng tin, ô soạn hiện “Trả lời …” và tự thêm @tên; trả lời hiện trích dẫn ngắn của tin được đáp,
+  bấm trích dẫn để nhảy tới tin gốc; người viết tin đó nhận thông báo. Bong bóng trao đổi rõ hơn, tin của mình có màu riêng.
+- **@nhắc tên đẹp hơn**: hiện thành chip; @tên của chính bạn tô vàng; danh sách gợi ý có ảnh đại diện và quyền trong dự án.
+
+### Thay đổi
+- **Hộp xác nhận của ứng dụng hiện giữa màn hình** (xoá thành viên, huỷ lời mời, lưu trữ…) thay hộp `confirm()` của trình duyệt.
+- **Thống nhất tên “Việc của tôi”** = góp ý chưa xử lý giao cho bạn phụ trách (dự án đang hoạt động). Menu, trang Dự án và trang Việc của tôi
+  dùng chung một con số; dòng tóm tắt tách rõ “N việc của tôi” và “M/T góp ý chưa xử lý trong K dự án”.
+- Nút **Hỏi trợ lý** thu thành icon tròn (nhãn hiện khi rê chuột) để không che nội dung.
+
 ## [2.3.0] - 2026-10-28
 
 ### Thêm

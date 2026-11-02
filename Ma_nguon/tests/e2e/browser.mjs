@@ -426,6 +426,87 @@ try {
   check((await adm.$$('#admin-projects tbody tr')).length >= 2, 'v23-admin-sees-all-projects');
   await anonCtx.close();
 
+  // ================= Bản 2.4 =================
+  // Tên "Việc của tôi" thống nhất: số trên menu = số ở trang Dự án; nút trợ lý là icon tròn
+  await designer.goto(`${BASE}/projects.php`);
+  const navCount = (await designer.textContent('.main-nav a[href="/inbox.php"] .nav-count')).trim();
+  const pillCount = (await designer.textContent('.summary-pill.mine strong')).trim();
+  check(navCount === pillCount && (await designer.textContent('.summary-pill.mine')).includes('việc của tôi'), 'v24-my-tasks-same-number', `${navCount} vs ${pillCount}`);
+  const fab = await designer.$eval('#chat-open', (b) => { const r = b.getBoundingClientRect(); return { w: r.width, h: r.height, text: b.textContent.trim() }; });
+  check(Math.abs(fab.w - fab.h) < 2 && fab.w <= 50 && fab.text === '', 'v24-assistant-button-round-icon', JSON.stringify(fab));
+  // Tìm dự án ngay khi gõ, rồi tìm ở máy chủ
+  await designer.fill('#project-filter input[name=q]', 'cổng');
+  const visibleCards = await designer.$$eval('.project-card[data-name]', (l) => l.filter((x) => !x.hidden).map((x) => x.querySelector('h2').textContent));
+  check(visibleCards.length === 1 && visibleCards[0].includes('Cổng'), 'v24-live-project-search', JSON.stringify(visibleCards));
+  await Promise.all([designer.waitForNavigation(), designer.press('#project-filter input[name=q]', 'Enter')]);
+  check((await designer.$$('.project-card[data-project]')).length === 1, 'v24-server-project-search');
+  await designer.screenshot({ path: path.join(OUT, 'v24-projects.png') });
+
+  // Hộp xác nhận giữa màn hình (không dùng confirm() của trình duyệt)
+  let nativeDialog = false;
+  designer.on('dialog', (d) => { nativeDialog = true; d.dismiss(); });
+  await designer.goto(newProjectUrl);
+  await designer.click('.member-list form[data-confirm] button[type=submit]');
+  await designer.waitForSelector('dialog.confirm-dialog[open]');
+  const box = await designer.$eval('dialog.confirm-dialog', (d) => { const r = d.getBoundingClientRect(); return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: innerWidth, h: innerHeight, text: d.textContent }; });
+  check(Math.abs(box.cx - box.w / 2) < 30 && Math.abs(box.cy - box.h / 2) < 120 && box.text.includes('khỏi dự án') && !nativeDialog, 'v24-confirm-dialog-centered', JSON.stringify(box));
+  await designer.waitForTimeout(300);
+  await designer.screenshot({ path: path.join(OUT, 'v24-confirm.png') });
+  await designer.click('dialog.confirm-dialog button:has-text("Huỷ")');
+  check(await designer.$('dialog.confirm-dialog') === null && (await designer.textContent('.member-list')).includes('Phạm Gia Huy'), 'v24-confirm-cancel-keeps-member');
+  // Lưu trữ dự án → chỉ xem → khôi phục
+  await designer.click('[data-open=dlg-edit-project]');
+  await designer.click('.archive-zone button[type=submit]');
+  await designer.waitForSelector('dialog.confirm-dialog[open]');
+  await Promise.all([designer.waitForNavigation(), designer.click('dialog.confirm-dialog [data-confirm-ok]')]);
+  check(await designer.$('.archived-banner') !== null && await designer.$('[data-open=dlg-new-screen]') === null, 'v24-archived-project-read-only');
+  await designer.goto(`${BASE}/projects.php?view=archived`);
+  check((await designer.textContent('.grid')).includes(projName), 'v24-archived-tab-lists-project');
+  await designer.goto(newProjectUrl);
+  await Promise.all([designer.waitForNavigation(), designer.click('.archived-banner button[type=submit]')]);
+  check(await designer.$('.archived-banner') === null, 'v24-restore-project');
+
+  // Chọn màu cho nét vẽ tay
+  await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);
+  await r.waitForSelector('.mark-pin');
+  await r.click('[data-toggle=hideMarks]');
+  await r.click('#color-pick summary');
+  await r.click('.swatch[data-swatch="22c55e"]');
+  await r.click('button[data-tool=draw]');
+  const box3 = await r.$eval('.annotator-image', (n) => { const b = n.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width }; });
+  const k3 = box3.w / 1000;
+  await r.mouse.move(box3.x + 420 * k3, box3.y + 120 * k3);
+  await r.mouse.down();
+  for (let i = 1; i <= 8; i++) { await r.mouse.move(box3.x + (420 + i * 20) * k3, box3.y + (120 + (i % 2 ? 25 : 0)) * k3, { steps: 2 }); }
+  await r.mouse.up();
+  await r.waitForSelector('.composer-pop');
+  await r.fill('textarea[aria-label="Nội dung nhận xét"]', 'E2E: nét xanh lá');
+  resp = r.waitForResponse((res) => res.url().includes('/api.php') && res.request().method() === 'POST');
+  await r.click('button:has-text("Lưu góp ý")');
+  const greenItem = (await (await resp).json()).item;
+  await r.click('[data-toggle=hideMarks]');
+  const strokeColor = await r.$eval(`.mark-stroke[data-stroke="${greenItem.id}"] .stroke-line`, (p) => getComputedStyle(p).stroke);
+  check(greenItem.color === '#22c55e' && strokeColor === 'rgb(34, 197, 94)', 'v24-freehand-color', `${greenItem.color} ${strokeColor}`);
+  await r.click('#color-pick summary');
+  await r.click('.swatch-auto');
+
+  // Trả lời theo luồng: trả lời riêng một tin → có trích dẫn, bấm trích dẫn nhảy tới tin gốc; @tên của mình được tô nổi
+  await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${arrowItem.id}`);
+  await r.waitForSelector('.reply [data-action=reply-to]');
+  await r.click('.reply:has-text("xem mũi tên giúp") [data-action=reply-to]');
+  check((await r.textContent('.reply-to-bar')).includes('Trả lời'), 'v24-reply-to-bar');
+  await r.fill('textarea[aria-label="Trả lời"]', 'E2E: trả lời riêng tin này');
+  await r.click('button:has-text("Gửi trả lời")');
+  await r.waitForSelector('.reply:has-text("trả lời riêng tin này") .reply-quote');
+  check((await r.textContent('.reply:has-text("trả lời riêng tin này") .reply-quote')).includes('xem mũi tên giúp'), 'v24-threaded-reply-quote');
+  await r.click('.reply:has-text("trả lời riêng tin này") .reply-quote');
+  await r.waitForSelector('.comment.flash-target');
+  check(true, 'v24-quote-jumps-to-original');
+  await r.screenshot({ path: path.join(OUT, 'v24-thread.png') });
+  await designer.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}&a=${arrowItem.id}`);
+  await designer.waitForSelector('.reply');
+  check(await designer.$('.thread-body .mention.is-me') !== null, 'v24-mention-of-me-highlighted');
+
   // Lọc trạng thái phía trình duyệt + giao diện tối
   await r.goto(`${BASE}/screen.php?id=${item.screen_id}&v=${item.image_version_id}`);
   await r.waitForSelector('.ann-list li');

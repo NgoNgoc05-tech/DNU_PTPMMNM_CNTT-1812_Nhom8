@@ -56,6 +56,7 @@
     this.selectedId = null;
     this.draft = null;
     this.tool = options.editable ? 'point' : 'pan';
+    this.color = null; // bản 2.4: màu nét đang chọn (null = màu mặc định theo trạng thái)
     this.state = { zoom: 1, panX: 0, panY: 0 };
     this.drag = null;
 
@@ -186,7 +187,7 @@
       var cls = (a.status === 'RESOLVED' ? ' is-resolved' : '') + (a.id === self.selectedId ? ' is-selected' : '') +
         (a.draft ? ' is-draft' : '') + (a.priority ? ' prio-' + a.priority : '') + (a.id && a.id === self.hoverId ? ' is-hover' : '');
       if ((a.shape === 'ARROW' || a.shape === 'DRAW') && a.points) {
-        self.drawStroke(svg, a.shape, a.points, c, 'mark-stroke' + cls, a.draft ? null : a.id);
+        self.drawStroke(svg, a.shape, a.points, c, 'mark-stroke' + cls + (a.color ? ' has-color' : ''), a.draft ? null : a.id, a.color);
       }
       if (a.shape === 'RECT') {
         var r = document.createElement('div');
@@ -195,6 +196,7 @@
         r.style.top = p.top + 'px';
         r.style.width = (a.w * c.scale) + 'px';
         r.style.height = (a.h * c.scale) + 'px';
+        if (a.color) { r.classList.add('has-color'); r.style.borderColor = a.color; r.style.backgroundColor = a.color + '1f'; }
         r.dataset.rect = a.id || '';
         layer.appendChild(r);
       }
@@ -235,12 +237,24 @@
   };
 
   /** Vẽ mũi tên hoặc nét vẽ tay theo toạ độ ảnh gốc; có thêm một nét trong suốt rộng để dễ bấm chọn. */
-  Annotator.prototype.drawStroke = function (svg, shape, points, c, cls, id) {
+  Annotator.prototype.drawStroke = function (svg, shape, points, c, cls, id, color) {
     var self = this;
     var d = points.map(function (pt, i) { var s = C.toScreen(pt[0], pt[1], c); return (i ? 'L' : 'M') + s.left.toFixed(1) + ' ' + s.top.toFixed(1); }).join(' ');
     var g = svgEl('g', { class: cls, 'data-stroke': id || '' });
     var head = /is-selected/.test(cls) ? 'sel' : /is-draft|mark-preview/.test(cls) ? 'draft' : /is-resolved/.test(cls) ? 'ok' : /prio-URGENT/.test(cls) ? 'urgent' : 'pin';
     var line = svgEl('path', { d: d, class: 'stroke-line' });
+    if (color && /^#[0-9a-f]{6}$/.test(color)) {
+      // Bản 2.4: nét có màu riêng; đầu mũi tên dùng marker cùng màu (tạo một lần cho mỗi màu).
+      line.style.stroke = color;
+      head = 'c' + color.slice(1);
+      if (!svg.querySelector('#pp-head-' + head)) {
+        var m = svgEl('marker', { id: 'pp-head-' + head, viewBox: '0 0 10 10', refX: '7', refY: '5', markerWidth: '5', markerHeight: '5', orient: 'auto-start-reverse' });
+        var hp = svgEl('path', { d: 'M0 0 10 5 0 10z' });
+        hp.style.fill = color;
+        m.appendChild(hp);
+        svg.querySelector('defs').appendChild(m);
+      }
+    }
     if (shape === 'ARROW') { line.setAttribute('marker-end', 'url(#pp-head-' + head + ')'); }
     g.appendChild(line);
     if (id) {
@@ -348,7 +362,7 @@
     if (!svg) { return; }
     var old = svg.querySelector('.mark-preview');
     if (old) { old.remove(); }
-    if (points && points.length > 1) { this.drawStroke(svg, shape, points, this.content(), 'mark-stroke mark-preview', null); }
+    if (points && points.length > 1) { this.drawStroke(svg, shape, points, this.content(), 'mark-stroke mark-preview', null, this.color); }
   };
 
   Annotator.prototype.onUp = function (e) {
@@ -375,18 +389,18 @@
         if (this.opt.onTooShort) { this.opt.onTooShort(d.mode); }
         return;
       }
-      this.setDraft({ shape: d.mode === 'arrow' ? 'ARROW' : 'DRAW', x: pts[0][0], y: pts[0][1], w: null, h: null, points: pts });
+      this.setDraft({ shape: d.mode === 'arrow' ? 'ARROW' : 'DRAW', x: pts[0][0], y: pts[0][1], w: null, h: null, points: pts, color: this.color });
       return;
     }
     if (d.mode === 'rect' && moved && d.rect && d.rect.w >= 2 && d.rect.h >= 2) {
-      this.setDraft({ shape: 'RECT', x: d.rect.x, y: d.rect.y, w: d.rect.w, h: d.rect.h });
+      this.setDraft({ shape: 'RECT', x: d.rect.x, y: d.rect.y, w: d.rect.w, h: d.rect.h, color: this.color });
     } else if (!moved) {
       this.setDraft({ shape: 'POINT', x: C.round2(d.img.x), y: C.round2(d.img.y), w: null, h: null });
     }
   };
 
   Annotator.prototype.setDraft = function (pos) {
-    this.draft = pos ? { draft: true, shape: pos.shape, x: pos.x, y: pos.y, w: pos.w, h: pos.h, points: pos.points || null, status: 'OPEN' } : null;
+    this.draft = pos ? { draft: true, shape: pos.shape, x: pos.x, y: pos.y, w: pos.w, h: pos.h, points: pos.points || null, color: pos.color || null, status: 'OPEN' } : null;
     this.render();
     if (pos && this.opt.onDraft) { this.opt.onDraft(pos); }
   };

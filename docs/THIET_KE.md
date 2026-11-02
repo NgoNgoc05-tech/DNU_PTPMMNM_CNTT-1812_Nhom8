@@ -34,6 +34,7 @@ Người tạo dự án luôn giữ quyền ADMIN. Quyền được kiểm tra �
 | PasswordReset (bản 2.3) | `password_resets` | mã đặt lại mật khẩu: chỉ lưu `token_hash` (SHA-256), người cấp, `expires_at` (+30 phút), `used_at` (dùng một lần) |
 | AdminLog (bản 2.3) | `admin_log` | nhật ký quản trị: ai, thao tác (LOCK, UNLOCK, GRANT_ADMIN, RESET_LINK, JOIN_PROJECT, DELETE_PROJECT…), đối tượng, chi tiết |
 | (thuộc tính 2.3) | `annotations.points`, `users.is_admin`, `users.locked_at`, `users.last_login_at`, `support_tickets.is_password_reset` | nét mũi tên/vẽ tay (jsonb `[[x,y],…]` theo pixel ảnh gốc, CHECK theo kiểu dấu); quản trị viên; khoá tài khoản; yêu cầu “Quên mật khẩu” |
+| (thuộc tính 2.4) | `projects.archived_at/by`, `annotations.color`, `annotations.due_reminded_for`, `comments.reply_to_id`, `users.email_reminders`, bảng `app_state` | lưu trữ dự án (chỉ xem); màu nét trong bảng 7 màu (CHECK); ngày hạn đã nhắc; trả lời theo luồng; tuỳ chọn email nhắc hạn; mốc quét nhắc hạn |
 | (thuộc tính) | `users.is_support` | tài khoản thuộc bộ phận hỗ trợ: thấy và trả lời mọi yêu cầu hỗ trợ, không cần thuộc dự án nào |
 | ActivityEvent (bản 2.0) | `annotation_events` | nhật ký mọi thay đổi: `kind ∈ {CREATED, REPLIED, EDITED, STATUS, PRIORITY, CATEGORY, ASSIGNEE, DUE, NOTE}`, giá trị cũ/mới, chi tiết, người làm, thời điểm |
 
@@ -128,9 +129,9 @@ flowchart LR
 | URL | Quyền tối thiểu | Mục đích |
 |---|---|---|
 | `/login.php`, `/register.php`, `/logout.php` | — | Đăng nhập, tạo tài khoản, đăng xuất |
-| `/projects.php` (GET/POST) | đăng nhập | Danh sách dự án của tôi; tạo dự án |
+| `/projects.php?q=&role=&state=&sort=&view=active\|archived` (GET/POST) | đăng nhập | Danh sách dự án của tôi (tìm, lọc, sắp xếp, mục Đã lưu trữ); tạo dự án |
 | `/project.php?id=` | VIEW | Bảng tổng quan: thống kê, tiến độ, màn hình, thành viên, hoạt động gần đây |
-| `/project_edit.php` (POST) | ADMIN | Sửa tên/mô tả dự án; đổi tên màn hình |
+| `/project_edit.php` (POST) | ADMIN | Sửa tên/mô tả dự án; đổi tên màn hình; `archive` / `unarchive` lưu trữ – khôi phục dự án (2.4) |
 | `/notifications.php` (GET/POST) | đăng nhập | Thông báo của tôi; đánh dấu đã đọc |
 | `/profile.php` (GET/POST) | đăng nhập | Hồ sơ: đổi tên, chức danh, mật khẩu (cần mật khẩu hiện tại) |
 | `/help.php` (GET/POST) | đăng nhập | Hỗ trợ khách hàng: trợ lý ảo, câu hỏi thường gặp, gửi/đóng yêu cầu của mình |

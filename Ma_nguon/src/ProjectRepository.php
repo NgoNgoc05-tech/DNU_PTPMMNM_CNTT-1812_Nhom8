@@ -28,7 +28,7 @@ final class ProjectRepository
     public function listForUser(int $userId): array
     {
         return fetchAll($this->c,
-            "SELECT p.id, p.name, p.description, pm.role, p.created_at,
+            "SELECT p.id, p.name, p.description, pm.role, p.created_at, p.created_by, p.archived_at, ou.name AS owner_name,
                     (SELECT COUNT(*) FROM screens s WHERE s.project_id = p.id) AS screens,
                     (SELECT COUNT(*) FROM project_members m WHERE m.project_id = p.id) AS members,
                     (SELECT string_agg(u.id || ':' || u.name, '|' ORDER BY m.created_at) FROM project_members m JOIN users u ON u.id = m.user_id
@@ -40,6 +40,7 @@ final class ProjectRepository
                        JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
                       WHERE s.project_id = p.id) AS last_activity
                FROM projects p JOIN project_members pm ON pm.project_id = p.id
+               JOIN users ou ON ou.id = p.created_by
                CROSS JOIN LATERAL (SELECT COUNT(*) FILTER (WHERE a.status = 'OPEN') AS open_items, COUNT(*) AS total_items
                                      FROM annotations a JOIN image_versions v ON v.id = a.image_version_id
                                      JOIN screens s ON s.id = v.screen_id WHERE s.project_id = p.id) st
@@ -47,9 +48,59 @@ final class ProjectRepository
               ORDER BY p.id", [$userId]);
     }
 
+    /**
+     * Bản 2.4: tìm kiếm, lọc, sắp xếp danh sách dự án (làm trên mảng đã lấy — mỗi người chỉ có vài chục dự án).
+     * $f: q (tên/mô tả/người tạo), view (active|archived), role (ADMIN|COMMENT|VIEW|OWNER), state (open|done|empty),
+     *     sort (activity|name|open|created).
+     */
+    public static function filter(array $projects, array $f, int $userId): array
+    {
+        $q = mb_strtolower(trim((string) ($f['q'] ?? '')));
+        $archived = ($f['view'] ?? 'active') === 'archived';
+        $role = (string) ($f['role'] ?? '');
+        $state = (string) ($f['state'] ?? '');
+        $list = array_values(array_filter($projects, function (array $p) use ($q, $archived, $role, $state, $userId): bool {
+            if (($p['archived_at'] !== null) !== $archived) {
+                return false;
+            }
+            if ($q !== '' && !str_contains(mb_strtolower($p['name'] . ' ' . $p['description'] . ' ' . ($p['owner_name'] ?? '')), $q)) {
+                return false;
+            }
+            if ($role === 'OWNER' ? (int) $p['created_by'] !== $userId : ($role !== '' && $p['role'] !== $role)) {
+                return false;
+            }
+            return match ($state) {
+                'open' => (int) $p['open_items'] > 0,
+                'done' => (int) $p['total_items'] > 0 && (int) $p['open_items'] === 0,
+                'empty' => (int) $p['total_items'] === 0,
+                default => true,
+            };
+        }));
+        $sort = (string) ($f['sort'] ?? 'activity');
+        usort($list, match ($sort) {
+            'name' => fn ($a, $b) => strcoll(mb_strtolower($a['name']), mb_strtolower($b['name'])) ?: $a['id'] <=> $b['id'],
+            'open' => fn ($a, $b) => (int) $b['open_items'] <=> (int) $a['open_items'] ?: $a['id'] <=> $b['id'],
+            'created' => fn ($a, $b) => (int) $b['id'] <=> (int) $a['id'],
+            default => fn ($a, $b) => strcmp((string) ($b['last_activity'] ?? $b['created_at']), (string) ($a['last_activity'] ?? $a['created_at'])) ?: (int) $b['id'] <=> (int) $a['id'],
+        });
+        return $list;
+    }
+
+    /** Lưu trữ / khôi phục dự án — chỉ Quản lý (kể cả khi dự án đang lưu trữ). */
+    public function setArchived(int $projectId, int $userId, bool $archived): void
+    {
+        if (Access::roleFor($this->c, $userId, $projectId) !== Access::ADMIN) {
+            throw new AppError('FORBIDDEN', 403);
+        }
+        queryParams($this->c,
+            'UPDATE projects SET archived_at = CASE WHEN $2 THEN COALESCE(archived_at, now()) ELSE NULL END,
+                                 archived_by = CASE WHEN $2 THEN $3::bigint ELSE NULL END WHERE id = $1',
+            [$projectId, $archived ? 't' : 'f', $userId]);
+    }
+
     public function find(int $projectId): array
     {
-        $row = fetchOne($this->c, 'SELECT id, name, description, created_by FROM projects WHERE id = $1', [$projectId]);
+        $row = fetchOne($this->c, 'SELECT id, name, description, created_by, archived_at FROM projects WHERE id = $1', [$projectId]);
         if ($row === null) {
             throw new AppError('NOT_FOUND', 404);
         }

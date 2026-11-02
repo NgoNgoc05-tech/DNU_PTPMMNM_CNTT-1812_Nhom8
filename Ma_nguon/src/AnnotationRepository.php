@@ -32,10 +32,17 @@ final class AnnotationRepository
      * Tạo dấu + nhận xét gốc + dòng lịch sử "mở" trong một giao dịch.
      * $meta (không bắt buộc): priority, category, assignee_id, due_date.
      */
+    /** Bảng màu nét vẽ (bản 2.4) — khớp ràng buộc annotations_color_check và bảng màu trên thanh công cụ. */
+    public const COLORS = ['#ef4444' => 'Đỏ', '#f97316' => 'Cam', '#eab308' => 'Vàng', '#22c55e' => 'Xanh lá', '#3b82f6' => 'Xanh dương', '#a855f7' => 'Tím', '#111827' => 'Đen'];
+
     public function create(int $versionId, string $shape, mixed $x, mixed $y, mixed $w, mixed $h, string $body, int $userId, array $meta = [], mixed $points = null): array
     {
         $body = cleanBody($body);
-        return transaction($this->c, function () use ($versionId, $shape, $x, $y, $w, $h, $body, $userId, $meta, $points): array {
+        $color = isset($meta['color']) && $meta['color'] !== '' ? strtolower((string) $meta['color']) : null;
+        if ($color !== null && (!isset(self::COLORS[$color]) || $shape === 'POINT')) {
+            throw new AppError('COLOR_INVALID', 422);
+        }
+        return transaction($this->c, function () use ($versionId, $shape, $x, $y, $w, $h, $body, $userId, $meta, $points, $color): array {
             // Khoá phiên bản ảnh để hai người tạo dấu cùng lúc không trùng số thứ tự.
             $version = fetchOne($this->c,
                 'SELECT v.id, v.width, v.height, s.project_id FROM image_versions v JOIN screens s ON s.id = v.screen_id
@@ -46,13 +53,13 @@ final class AnnotationRepository
             $pos = Coordinates::validate($shape, $x, $y, $w, $h, (int) $version['width'], (int) $version['height'], $points);
             $m = $this->cleanMeta($meta, (int) $version['project_id']);
             $row = fetchOne($this->c,
-                'INSERT INTO annotations (image_version_id, seq_no, shape, x, y, w, h, created_by, priority, category, assignee_id, due_date, points)
+                'INSERT INTO annotations (image_version_id, seq_no, shape, x, y, w, h, created_by, priority, category, assignee_id, due_date, points, color)
                  VALUES ($1, (SELECT COALESCE(MAX(seq_no), 0) + 1 FROM annotations WHERE image_version_id = $1),
-                         $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+                         $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13)
                  RETURNING id',
                 [$versionId, $pos['shape'], $pos['x'], $pos['y'], $pos['w'], $pos['h'], $userId,
                  $m['priority'] ?? 'MEDIUM', $m['category'] ?? 'OTHER', $m['assignee_id'] ?? null, $m['due_date'] ?? null,
-                 $pos['points'] === null ? null : json_encode($pos['points'])]);
+                 $pos['points'] === null ? null : json_encode($pos['points']), $color]);
             $annotationId = (int) $row['id'];
             queryParams($this->c, 'INSERT INTO comments (annotation_id, author_id, body) VALUES ($1, $2, $3)',
                 [$annotationId, $userId, $body]);
@@ -67,10 +74,14 @@ final class AnnotationRepository
         });
     }
 
-    public function reply(int $annotationId, string $body, int $userId): array
+    /**
+     * Trả lời trong một góp ý. Bản 2.4: $replyToId cho biết đang đáp lại tin nào (nhận xét gốc hoặc một trả lời khác
+     * trong CÙNG góp ý) để giao diện hiện theo luồng có trích dẫn; người viết tin đó nhận thông báo "trả lời".
+     */
+    public function reply(int $annotationId, string $body, int $userId, ?int $replyToId = null): array
     {
         $body = cleanBody($body);
-        return transaction($this->c, function () use ($annotationId, $body, $userId): array {
+        return transaction($this->c, function () use ($annotationId, $body, $userId, $replyToId): array {
             $root = fetchOne($this->c,
                 'SELECT c.id, a.created_by, a.assignee_id, s.project_id FROM comments c JOIN annotations a ON a.id = c.annotation_id
                    JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
@@ -78,13 +89,24 @@ final class AnnotationRepository
             if ($root === null) {
                 throw new AppError('NOT_FOUND', 404);
             }
+            $target = null;
+            if ($replyToId !== null && $replyToId > 0) {
+                $target = fetchOne($this->c, 'SELECT id, author_id FROM comments WHERE id = $1 AND annotation_id = $2', [$replyToId, $annotationId]);
+                if ($target === null) {
+                    throw new AppError('REPLY_TARGET_INVALID', 422);
+                }
+            }
             $row = fetchOne($this->c,
-                'INSERT INTO comments (annotation_id, parent_id, author_id, body) VALUES ($1, $2, $3, $4) RETURNING id',
-                [$annotationId, (int) $root['id'], $userId, $body]);
+                'INSERT INTO comments (annotation_id, parent_id, author_id, body, reply_to_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                [$annotationId, (int) $root['id'], $userId, $body, $target !== null && (int) $target['id'] !== (int) $root['id'] ? (int) $target['id'] : null]);
             $this->event($annotationId, $userId, 'REPLIED', '', '', mb_substr($body, 0, 200));
             $n = new NotificationRepository($this->c);
             $sent = $n->notify($n->mentionedMembers((int) $root['project_id'], $body), $userId, 'MENTION', $annotationId, $body);
-            $n->notify([(int) $root['created_by'], (int) ($root['assignee_id'] ?? 0)], $userId, 'REPLY', $annotationId, $body, $sent);
+            $to = [(int) $root['created_by'], (int) ($root['assignee_id'] ?? 0)];
+            if ($target !== null) {
+                $to[] = (int) $target['author_id'];
+            }
+            $n->notify($to, $userId, 'REPLY', $annotationId, $body, $sent);
             return ['id' => (int) $row['id']];
         });
     }
@@ -323,6 +345,18 @@ final class AnnotationRepository
     }
 
     /** Góp ý chưa xử lý được giao cho một người (trong các dự án họ còn là thành viên). */
+    /**
+     * “Việc của tôi” = góp ý CHƯA XỬ LÝ mà mình là NGƯỜI PHỤ TRÁCH, trong dự án đang hoạt động (không tính dự án lưu trữ).
+     * Dùng chung cho số trên menu, trang Dự án và trang Việc của tôi để con số luôn khớp nhau.
+     */
+    public function countAssigned(int $userId): int
+    {
+        return (int) fetchOne($this->c,
+            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+               JOIN projects p ON p.id = s.project_id JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+              WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL", [$userId])['n'];
+    }
+
     public function assignedTo(int $userId, int $limit = 20): array
     {
         $rows = fetchAll($this->c,
@@ -335,7 +369,7 @@ final class AnnotationRepository
                JOIN projects p ON p.id = s.project_id
                JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
                JOIN comments rc ON rc.annotation_id = a.id AND rc.parent_id IS NULL
-              WHERE a.assignee_id = $1 AND a.status = 'OPEN'
+              WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL
               ORDER BY a.due_date ASC NULLS LAST,
                        CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, a.id
               LIMIT $2", [$userId, $limit]);
@@ -464,7 +498,7 @@ final class AnnotationRepository
     private function query(string $where, array $params, bool $withThread = true, int $viewerId = 0, string $order = 's.id, v.version_no, a.seq_no'): array
     {
         $rows = fetchAll($this->c,
-            "SELECT a.id, a.image_version_id, a.seq_no, a.shape, a.x, a.y, a.w, a.h, a.points, a.status, a.lock_version,
+            "SELECT a.id, a.image_version_id, a.seq_no, a.shape, a.x, a.y, a.w, a.h, a.points, a.color, a.status, a.lock_version,
                     a.created_at, a.updated_at, a.created_by, u.name AS author,
                     a.priority, a.category, a.assignee_id, asg.name AS assignee, a.due_date,
                     (a.status = 'OPEN' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE) AS overdue,
@@ -492,7 +526,7 @@ final class AnnotationRepository
         }
         $ids = '{' . implode(',', array_column($items, 'id')) . '}';
         $replies = fetchAll($this->c,
-            'SELECT c.id, c.annotation_id, c.body, c.lock_version, c.author_id, u.name AS author, c.created_at, c.updated_at,
+            'SELECT c.id, c.annotation_id, c.body, c.lock_version, c.author_id, u.name AS author, c.created_at, c.updated_at, c.reply_to_id,
                     (SELECT COUNT(*) FROM comment_revisions r WHERE r.comment_id = c.id) AS revisions
                FROM comments c JOIN users u ON u.id = c.author_id
               WHERE c.annotation_id = ANY($1::bigint[]) AND c.parent_id IS NOT NULL ORDER BY c.id', [$ids]);
@@ -530,6 +564,7 @@ final class AnnotationRepository
                 'lock_version' => (int) $r['lock_version'], 'created_at' => $r['created_at'],
                 'edited' => (int) $r['revisions'] > 0, 'reactions' => $reactions[(int) $r['id']] ?? [],
                 'attachments' => $files[(int) $r['id']] ?? [],
+                'reply_to_id' => $r['reply_to_id'] === null ? null : (int) $r['reply_to_id'],
             ];
         }
         foreach ($history as $h) {
@@ -591,6 +626,7 @@ final class AnnotationRepository
             'w' => $r['w'] === null ? null : (float) $r['w'],
             'h' => $r['h'] === null ? null : (float) $r['h'],
             'points' => $r['points'] === null ? null : json_decode($r['points'], true),
+            'color' => $r['color'],
             'status' => $r['status'],
             'lock_version' => (int) $r['lock_version'],
             'author' => $r['author'],

@@ -261,6 +261,28 @@ try {
     same([str_contains($html, 'data-reset-done'), $hd['referrer-policy'] ?? ''], [true, 'no-referrer'], 'http-reset-password-via-link');
     queryParams($c, 'UPDATE users SET password_hash = $2 WHERE id = $1', [$fx['users']['R'], password_hash('Pinpoint@123', PASSWORD_DEFAULT)]);
 
+    echo "-- Bản 2.4: lưu trữ, lọc dự án, màu nét, trả lời theo luồng qua HTTP\n";
+    $A24 = $fx['projects']['A'];
+    [$st] = $reviewer->request('POST', '/project_edit.php', http_build_query(['csrf' => $reviewer->csrf, 'action' => 'archive', 'project_id' => $A24]), $form);
+    same([$st, fetchOne($c, 'SELECT archived_at FROM projects WHERE id = $1', [$A24])['archived_at']], [403, null], 'http-commenter-cannot-archive');
+    [$st] = $designer->request('POST', '/project_edit.php', http_build_query(['csrf' => $designer->csrf, 'action' => 'archive', 'project_id' => $A24]), $form);
+    [, , $act] = $designer->request('GET', '/projects.php');
+    [, , $arc] = $designer->request('GET', '/projects.php?view=archived');
+    same([$st, str_contains($act, 'data-project="' . $A24 . '"'), str_contains($arc, 'data-project="' . $A24 . '"')], [303, false, true], 'http-archived-moves-to-archive-tab');
+    [$st, , $body] = $reviewer->api(['action' => 'reply', 'annotation_id' => $arrowItem['id'], 'body' => 'Khi đã lưu trữ']);
+    same([$st, json_decode($body, true)['error'] ?? ''], [409, 'PROJECT_ARCHIVED'], 'http-archived-project-read-only');
+    [, , $html] = $reviewer->request('GET', '/screen.php?id=' . $arrowItem['screen_id']);
+    same(str_contains($html, 'data-tool="point"'), false, 'http-archived-viewer-has-no-tools');
+    $designer->request('POST', '/project_edit.php', http_build_query(['csrf' => $designer->csrf, 'action' => 'unarchive', 'project_id' => $A24]), $form);
+    [, , $html] = $designer->request('GET', '/projects.php?q=' . rawurlencode('cổng') . '&sort=name');
+    same([str_contains($html, 'data-project="' . $fx['projects']['B'] . '"'), str_contains($html, 'data-project="' . $A24 . '"')], [true, false], 'http-project-search');
+    [$st, , $body] = $reviewer->api(['action' => 'create', 'version_id' => $vA, 'shape' => 'ARROW', 'color' => '#a855f7', 'points' => [[50, 50], [200, 120]], 'body' => 'Mũi tên tím']);
+    same([$st, json_decode($body, true)['item']['color'] ?? ''], [201, '#a855f7'], 'http-create-colored-arrow');
+    [$st] = $reviewer->api(['action' => 'create', 'version_id' => $vA, 'shape' => 'ARROW', 'color' => 'red;x', 'points' => [[50, 50], [200, 120]], 'body' => 'x']);
+    same($st, 422, 'http-bad-color-422');
+    [$st, , $body] = $designer->api(['action' => 'reply', 'annotation_id' => $arrowItem['id'], 'body' => 'Đáp tin có ảnh', 'reply_to_id' => $replyId]);
+    same($st, 201, 'http-reply-to-specific-comment');
+
     [$st] = $designer->request('GET', '/admin.php');
     same($st, 403, 'http-admin-forbidden-for-user');
     $adminB = new Browser($base);

@@ -213,7 +213,7 @@ ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS handled_by bigint REFERENCE
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS ticket_id bigint REFERENCES support_tickets(id) ON DELETE CASCADE;
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
 ALTER TABLE notifications ADD CONSTRAINT notifications_kind_check
-    CHECK (kind IN ('MENTION', 'ASSIGNED', 'REPLY', 'STATUS', 'INVITE', 'INVITE_REPLY', 'TICKET', 'TICKET_REPLY'));
+    CHECK (kind IN ('MENTION', 'ASSIGNED', 'REPLY', 'STATUS', 'INVITE', 'INVITE_REPLY', 'TICKET', 'TICKET_REPLY', 'DUE_SOON'));
 
 -- =====================================================================
 -- Bản 2.3: mũi tên / vẽ tay, ảnh đính kèm trả lời, quên mật khẩu, quản trị hệ thống
@@ -272,4 +272,38 @@ CREATE TABLE IF NOT EXISTS admin_log (
     target     varchar(200) NOT NULL DEFAULT '',
     detail     varchar(300) NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- =====================================================================
+-- Bản 2.4: lưu trữ dự án, màu nét vẽ, trả lời theo luồng, nhắc hạn trước 24 giờ
+-- =====================================================================
+
+-- Dự án đã lưu trữ: ẩn khỏi danh sách chính, chỉ xem (không tạo/sửa góp ý), Quản lý có thể khôi phục.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_by bigint REFERENCES users(id) ON DELETE SET NULL;
+
+-- Màu nét mũi tên / vẽ tay / vùng (NULL = màu theo trạng thái như cũ). Chỉ nhận các màu trong bảng màu.
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS color varchar(7);
+ALTER TABLE annotations DROP CONSTRAINT IF EXISTS annotations_color_check;
+ALTER TABLE annotations ADD CONSTRAINT annotations_color_check
+    CHECK (color IS NULL OR color IN ('#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#111827'));
+
+-- Nhắc hạn: ngày hạn đã được nhắc (để mỗi hạn chỉ nhắc một lần, đổi hạn thì nhắc lại).
+ALTER TABLE annotations ADD COLUMN IF NOT EXISTS due_reminded_for date;
+
+-- Trả lời theo luồng: trả lời này đáp lại tin nào trong cùng góp ý (NULL = đáp lại nhận xét gốc).
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_id bigint REFERENCES comments(id) ON DELETE SET NULL;
+
+-- Tuỳ chọn nhận email nhắc hạn (chỉ có tác dụng khi máy chủ cấu hình PINPOINT_MAIL_FROM).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_reminders boolean NOT NULL DEFAULT true;
+
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_kind_check
+    CHECK (kind IN ('MENTION', 'ASSIGNED', 'REPLY', 'STATUS', 'INVITE', 'INVITE_REPLY', 'TICKET', 'TICKET_REPLY', 'DUE_SOON'));
+
+-- Trạng thái chạy việc định kỳ (ví dụ lần quét nhắc hạn gần nhất) khi không có cron.
+CREATE TABLE IF NOT EXISTS app_state (
+    key        varchar(50) PRIMARY KEY,
+    value      varchar(200) NOT NULL DEFAULT '',
+    updated_at timestamptz NOT NULL DEFAULT now()
 );

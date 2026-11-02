@@ -181,6 +181,27 @@
     document.querySelectorAll('button[data-tool]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.tool === tool)); });
   }
   document.querySelectorAll('button[data-tool]').forEach(function (b) { b.addEventListener('click', function () { setTool(b.dataset.tool); }); });
+
+  // Bản 2.4: bảng màu cho vùng / mũi tên / vẽ tay; nhớ màu đã chọn trên trình duyệt này.
+  var pick = document.getElementById('color-pick');
+  if (pick) {
+    var now = document.getElementById('swatch-now');
+    var setColor = function (hex) {
+      view.color = hex || null;
+      pick.querySelectorAll('.swatch').forEach(function (b) { b.setAttribute('aria-pressed', String((b.dataset.color || '') === (hex || ''))); });
+      now.style.background = hex || '';
+      now.classList.toggle('is-auto', !hex);
+      if (view.draft && view.draft.shape !== 'POINT') { view.draft.color = view.color; view.render(); }
+      try { localStorage.setItem('pinpoint-color', hex || ''); } catch (e) { /* bỏ qua */ }
+    };
+    pick.querySelectorAll('.swatch').forEach(function (b) {
+      if (b.dataset.color) { b.style.background = b.dataset.color; }
+      b.addEventListener('click', function () { setColor(b.dataset.color); pick.open = false; });
+    });
+    var saved = '';
+    try { saved = localStorage.getItem('pinpoint-color') || ''; } catch (e) { saved = ''; }
+    setColor(/^#[0-9a-f]{6}$/.test(saved) && pick.querySelector('[data-color="' + saved + '"]') ? saved : '');
+  }
   document.querySelectorAll('[data-zoom]').forEach(function (b) {
     b.addEventListener('click', function () {
       if (b.dataset.zoom === 'fit') { view.fit(); }

@@ -47,14 +47,24 @@ final class Access
      * Ném lỗi nếu không đủ quyền. Người không phải thành viên nhận NOT_FOUND (404) để
      * không tiết lộ dự án của nhóm khác có tồn tại hay không.
      */
-    public static function require(PgSql\Connection $c, int $userId, int $projectId, string $required): string
+    public static function require(PgSql\Connection $c, int $userId, int $projectId, string $required, bool $ignoreArchive = false): string
     {
-        $role = self::roleFor($c, $userId, $projectId);
-        if ($role === null) {
+        $row = fetchOne($c,
+            'SELECT pm.role, p.archived_at FROM project_members pm JOIN projects p ON p.id = pm.project_id
+              WHERE pm.project_id = $1 AND pm.user_id = $2', [$projectId, $userId]);
+        if ($row === null) {
             throw new AppError('NOT_FOUND', 404);
         }
+        $role = $row['role'];
         if (!self::allows($role, $required)) {
             throw new AppError('FORBIDDEN', 403);
+        }
+        // Bản 2.4: dự án đã lưu trữ chỉ xem — mọi thao tác ghi bị chặn ở máy chủ, giao diện nhận quyền Chỉ xem.
+        if ($row['archived_at'] !== null && !$ignoreArchive) {
+            if ($required !== self::VIEW) {
+                throw new AppError('PROJECT_ARCHIVED', 409);
+            }
+            return self::VIEW;
         }
         return $role;
     }

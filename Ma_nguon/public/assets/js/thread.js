@@ -8,6 +8,9 @@
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICONS = {
+    'archive': '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>',
+    'palette': '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-.9-.8-1.3-.8-2.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
+    'reply': '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
     'arrow-tool': '<path d="M5 19 19 5"/><path d="M9 5h10v10"/>',
     'pen': '<path d="M3 17c2.5-.5 3.5-6 6.5-6s3 5.5 6 5.5S20 13 21 10"/>',
     'paperclip': '<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/>',
@@ -295,8 +298,10 @@
   }
 
   /** Đoạn văn có @tên thành viên được tô màu; mọi phần đều là textContent. */
-  function richBody(text, members, cls) {
+  function richBody(text, members, cls, meId) {
     var box = el('div', { class: cls || 'thread-body' });
+    var me = '';
+    (members || []).forEach(function (m) { if (meId && m.id === meId) { me = cleanName(m.name); } });
     var names = (members || []).map(function (m) { return cleanName(m.name); }).filter(Boolean)
       .sort(function (a, b) { return b.length - a.length; });
     var i = 0;
@@ -310,7 +315,7 @@
       }
       if (hit) {
         if (buf) { box.appendChild(document.createTextNode(buf)); buf = ''; }
-        box.appendChild(el('span', { class: 'mention', text: '@' + hit }));
+        box.appendChild(el('span', { class: 'mention' + (hit === me ? ' is-me' : ''), title: hit === me ? 'Nhắc tới bạn' : 'Đã nhắc tên ' + hit, text: '@' + hit }));
         i += hit.length + 1;
       } else { buf += text.charAt(i); i++; }
     }
@@ -335,10 +340,11 @@
     }
     function draw() {
       while (menuWrap.firstChild) { menuWrap.removeChild(menuWrap.firstChild); }
-      var menu = el('div', { class: 'menu' });
+      var menu = el('div', { class: 'menu' }, [el('div', { class: 'mention-head', text: 'Nhắc tên thành viên · ↑↓ chọn, Enter chèn' })]);
+      var ROLE = { ADMIN: 'Quản lý', COMMENT: 'Góp ý', VIEW: 'Chỉ xem' };
       matches.forEach(function (m, i) {
         menu.appendChild(el('button', { type: 'button', class: i === active ? 'is-active' : '', onmousedown: function (e) { e.preventDefault(); pick(m); } },
-          [avatar(m.name, m.id, 'sm'), cleanName(m.name)]));
+          [avatar(m.name, m.id, 'sm'), el('span', { class: 'mention-who' }, [el('strong', { text: cleanName(m.name) }), m.role ? el('small', { text: ROLE[m.role] || m.role }) : null])]));
       });
       menuWrap.appendChild(menu);
       menuWrap.hidden = matches.length === 0;
@@ -471,7 +477,7 @@
       e.preventDefault();
       if (!comp.area.value.trim()) { comp.area.focus(); return; }
       send.disabled = true;
-      self.opt.api.post({ action: 'create', version_id: cfg.versionId, shape: d.shape, x: d.x, y: d.y, w: d.w, h: d.h, points: d.points || undefined, body: comp.area.value,
+      self.opt.api.post({ action: 'create', version_id: cfg.versionId, shape: d.shape, x: d.x, y: d.y, w: d.w, h: d.h, points: d.points || undefined, color: d.shape !== 'POINT' && d.color ? d.color : undefined, body: comp.area.value,
         priority: pSel.value, category: cSel.value, assignee_id: Number(aSel.value), due_date: dIn.getIso() })
         .then(function (res) { toast('Đã lưu góp ý #' + res.item.seq_no); onDone(); self.opt.onChanged(res.item.id); })
         .catch(function (err) { send.disabled = false; toast(err.message, true); });
@@ -546,22 +552,41 @@
 
     // Trao đổi
     wrap.appendChild(el('div', { class: 'block-title' }, [icon('chat'), 'Trao đổi · ' + a.replies.length + ' trả lời']));
+    // Bản 2.4: trả lời theo luồng — mỗi trả lời có thể đáp lại một tin cụ thể (trích dẫn ngắn, bấm để nhảy tới tin gốc).
+    var byId = {};
+    byId[a.comment_id] = { id: a.comment_id, author: a.author, body: a.body };
+    a.replies.forEach(function (r) { byId[r.id] = r; });
     if (a.replies.length) {
-      var reps = el('div', { class: 'replies' });
-      a.replies.forEach(function (r) { reps.appendChild(self.renderComment(r, true)); });
+      var reps = el('div', { class: 'replies thread-line' });
+      a.replies.forEach(function (r) { reps.appendChild(self.renderComment(r, true, byId[r.reply_to_id || a.comment_id] || null, r.reply_to_id === null)); });
       wrap.appendChild(reps);
     }
     if (cfg.canComment) {
       var btn = el('button', { class: 'btn btn-sm', type: 'submit' }, [icon('send'), 'Gửi trả lời']);
       var rc = composer({ label: 'Trả lời', placeholder: 'Trả lời nhận xét này… (gõ @ để nhắc tên, Ctrl+V để dán ảnh chụp)', members: cfg.members, onSubmit: function () { replyForm.requestSubmit(); } });
       var files = attachPicker(rc.area);
+      var quoteBar = el('div', { class: 'reply-to-bar', hidden: 'hidden' });
+      self.replyTo = null;
+      self.setReplyTo = function (c) {
+        self.replyTo = c;
+        quoteBar.textContent = '';
+        quoteBar.hidden = !c;
+        if (!c) { return; }
+        quoteBar.appendChild(icon('reply'));
+        quoteBar.appendChild(el('span', { class: 'rt-text' }, [el('strong', { text: 'Trả lời ' + cleanName(c.author) }), el('span', { text: ' · ' + c.body.slice(0, 80) + (c.body.length > 80 ? '…' : '') })]));
+        quoteBar.appendChild(el('button', { type: 'button', class: 'rt-x', 'aria-label': 'Bỏ trả lời tin này', text: '×', onclick: function () { self.setReplyTo(null); } }));
+        var tag = '@' + cleanName(c.author) + ' ';
+        if (c.author_id !== cfg.userId && rc.area.value.indexOf(tag.trim()) === -1) { rc.area.value = tag + rc.area.value; }
+        rc.area.focus();
+        rc.area.selectionStart = rc.area.selectionEnd = rc.area.value.length;
+      };
       var replyForm = el('form', { class: 'composer', onsubmit: function (e) {
         e.preventDefault();
         var picked = files.list();
         if (!rc.area.value.trim() && !picked.length) { return; }
         btn.disabled = true;
         var api = self.opt.api;
-        api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value.trim() || '📎 Ảnh đính kèm' })
+        api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value.trim() || '📎 Ảnh đính kèm', reply_to_id: self.replyTo ? self.replyTo.id : undefined })
           .then(function (res) {
             // Tải lần lượt từng ảnh; ảnh lỗi không làm mất trả lời đã gửi.
             var failed = 0;
@@ -573,7 +598,7 @@
             });
           })
           .catch(function (err) { btn.disabled = false; toast(err.message, true); });
-      } }, [rc.menu, rc.area, files.strip, el('div', { class: 'composer-foot' }, [files.button, files.input, el('span', { class: 'hint', text: 'Ctrl+Enter để gửi' }), btn])]);
+      } }, [quoteBar, rc.menu, rc.area, files.strip, el('div', { class: 'composer-foot' }, [files.button, files.input, el('span', { class: 'hint', text: 'Ctrl+Enter để gửi' }), btn])]);
       wrap.appendChild(replyForm);
     }
 
@@ -735,12 +760,18 @@
       .catch(function (err) { toast(err.message, true); });
   };
 
-  ThreadPanel.prototype.renderComment = function (c, isReply) {
+  ThreadPanel.prototype.renderComment = function (c, isReply, target, toRoot) {
     var self = this;
     var cfg = this.opt.cfg;
-    var box = el('div', { class: 'comment ' + (isReply ? 'reply' : 'root-comment'), 'data-comment': c.id });
+    var box = el('div', { class: 'comment ' + (isReply ? 'reply' : 'root-comment') + (c.author_id === cfg.userId ? ' is-mine' : ''), 'data-comment': c.id });
     var main = el('div', { class: 'c-main' });
-    var bodyEl = richBody(c.body, cfg.members);
+    var bodyEl = richBody(c.body, cfg.members, null, cfg.userId);
+    if (isReply && target && !toRoot) {
+      main.appendChild(el('button', { type: 'button', class: 'reply-quote', title: 'Xem tin được trả lời', onclick: function () {
+        var t = self.body.querySelector('[data-comment="' + target.id + '"]');
+        if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.remove('flash-target'); void t.offsetWidth; t.classList.add('flash-target'); }
+      } }, [icon('reply'), el('strong', { text: cleanName(target.author) }), el('span', { text: target.body.slice(0, 70) + (target.body.length > 70 ? '…' : '') })]));
+    }
     main.appendChild(el('div', { class: 'c-head' }, [el('span', { class: 'who', text: cleanName(c.author) }),
       el('time', { title: fmt(c.created_at), text: fmt(c.created_at) + ' · ' + ago(c.created_at) }),
       c.edited ? el('span', { class: 'edited', text: 'đã sửa' }) : null]));
@@ -752,6 +783,10 @@
       })));
     }
     var actions = this.renderReactions(c);
+    if (cfg.canComment && self.selectedId) {
+      actions.appendChild(el('button', { class: 'btn btn-xs btn-subtle', type: 'button', 'data-action': 'reply-to', title: 'Trả lời riêng tin này',
+        onclick: function () { if (self.setReplyTo) { self.setReplyTo(c); } } }, [icon('reply'), 'Trả lời']));
+    }
     main.appendChild(actions);
     box.appendChild(avatar(c.author, c.author_id, isReply ? 'sm' : null));
     box.appendChild(main);

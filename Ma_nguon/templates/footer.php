@@ -1,7 +1,7 @@
 </main>
 <?php if (!empty($user) && !($wide ?? false) && ($active ?? '') !== 'help'): ?>
 <div class="chat-fab" id="chat-fab">
-<button type="button" class="chat-fab-btn" id="chat-open" aria-expanded="false" aria-controls="chat-panel" title="Hỏi trợ lý ảo"><?= icon('sparkle') ?><span>Hỏi trợ lý</span></button>
+<button type="button" class="chat-fab-btn" id="chat-open" aria-expanded="false" aria-controls="chat-panel" aria-label="Hỏi trợ lý ảo" data-tip="Hỏi trợ lý ảo"><?= icon('sparkle') ?></button>
 <div class="chat-panel card" id="chat-panel" hidden role="dialog" aria-label="Trợ lý ảo Pinpoint">
 <div class="section-title"><h2><?= icon('sparkle') ?>Trợ lý ảo</h2><button type="button" class="btn btn-subtle btn-icon btn-sm" id="chat-close" aria-label="Đóng"><?= icon('x') ?></button></div>
 <div class="chat-log" id="chat-log" aria-live="polite"></div>

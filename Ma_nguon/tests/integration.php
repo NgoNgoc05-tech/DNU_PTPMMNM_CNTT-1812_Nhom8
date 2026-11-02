@@ -367,6 +367,56 @@ try {
     same(array_slice($actions, 0, 3), ['DELETE_PROJECT', 'JOIN_PROJECT', 'RESET_LINK'], 'v23-admin-actions-logged');
     queryParams($c, "DELETE FROM admin_log WHERE admin_id = $1", [$AD]);
 
+    echo "-- Bản 2.4: lưu trữ dự án, màu nét, trả lời theo luồng, nhắc hạn\n";
+    $projects24 = new ProjectRepository($c);
+    throwsCode(fn () => $projects24->setArchived($B, $R, true), 'FORBIDDEN', 'v24-only-manager-archives');
+    $projects24->setArchived($B, $D, true);
+    $vB1 = $v['B|Đăng nhập|1'];
+    same(Access::require($c, $D, $B, Access::VIEW), 'VIEW', 'v24-archived-project-is-view-only');
+    throwsCode(fn () => Access::require($c, $D, $B, Access::COMMENT), 'PROJECT_ARCHIVED', 'v24-archived-blocks-writes');
+    same(Access::require($c, $D, $B, Access::ADMIN, true), 'ADMIN', 'v24-owner-can-still-delete-archived');
+    same(count(ProjectRepository::filter($projects24->listForUser($D), ['view' => 'archived'], $D)), 1, 'v24-archived-listed-separately');
+    $projects24->setArchived($B, $D, false);
+    same(Access::require($c, $R, $B, Access::COMMENT), 'COMMENT', 'v24-unarchive-restores-rights');
+    $colored = $repo->create($homeV2, 'DRAW', null, null, null, null, 'Nét màu xanh', $R, ['color' => '#3B82F6'], [[10, 10], [60, 40]]);
+    same($repo->find($colored['id'])['color'], '#3b82f6', 'v24-stroke-color-saved');
+    throwsCode(fn () => $repo->create($homeV2, 'DRAW', null, null, null, null, 'x', $R, ['color' => '#123456'], [[10, 10], [60, 40]]), 'COLOR_INVALID', 'v24-color-outside-palette-rejected');
+    throwsCode(fn () => $repo->create($homeV2, 'POINT', 5, 5, null, null, 'x', $R, ['color' => '#ef4444']), 'COLOR_INVALID', 'v24-point-has-no-color');
+    $r1 = $repo->reply($colored['id'], 'Trả lời thứ nhất', $D)['id'];
+    $markR = (new NotificationRepository($c))->latestId($D);
+    $repo->reply($colored['id'], 'Đáp lại tin của chị', $R, $r1);
+    $thread = array_values(array_filter($repo->listForVersion($homeV2), fn ($a) => $a['id'] === $colored['id']))[0];
+    same([$thread['replies'][0]['reply_to_id'], $thread['replies'][1]['reply_to_id']], [null, $r1], 'v24-reply-to-stored');
+    same(array_column((new NotificationRepository($c))->since($D, $markR), 'kind'), ['REPLY'], 'v24-replied-author-notified');
+    throwsCode(fn () => $repo->reply($colored['id'], 'x', $R, (int) $thread['comment_id'] + 999999), 'REPLY_TARGET_INVALID', 'v24-reply-to-other-annotation-rejected');
+    same($repo->reply($colored['id'], 'Đáp nhận xét gốc', $R, (int) $thread['comment_id'])['id'] > 0, true, 'v24-reply-to-root-allowed');
+    // Nhắc hạn trước 24 giờ
+    $notes24 = new NotificationRepository($c);
+    // Chỉ đánh dấu "đã nhắc" cho dữ liệu thử của bộ kiểm thử này (không đụng dữ liệu thật trong CSDL).
+    queryParams($c, 'UPDATE annotations a SET due_reminded_for = due_date FROM image_versions v JOIN screens s ON s.id = v.screen_id
+                      WHERE v.id = a.image_version_id AND s.project_id = ANY($1::bigint[]) AND a.due_date IS NOT NULL',
+        ['{' . implode(',', $fx['projects']) . '}']);
+    $repo->update($colored['id'], ['assignee_id' => $D, 'due_date' => date('Y-m-d', strtotime('+1 day'))], $repo->find($colored['id'])['lock_version'], $R);
+    $markD = $notes24->latestId($D);
+    same($notes24->remindDue(true) >= 1, true, 'v24-due-soon-reminder-sent');
+    $dueNote = array_values(array_filter($notes24->since($D, $markD), fn ($n) => $n['kind'] === 'DUE_SOON'));
+    same([count($dueNote), str_starts_with($dueNote[0]['body'] ?? '', 'Hạn ngày mai'), $dueNote[0]['actor'] ?? ''], [1, true, '⏰ Nhắc hạn'], 'v24-due-soon-to-assignee');
+    $markD = $notes24->latestId($D);
+    $notes24->remindDue(true);
+    same(array_filter($notes24->since($D, $markD), fn ($n) => $n['kind'] === 'DUE_SOON'), [], 'v24-reminded-only-once');
+    $repo->update($colored['id'], ['due_date' => date('Y-m-d')], $repo->find($colored['id'])['lock_version'], $R);
+    $notes24->remindDue(true);
+    same(count(array_filter($notes24->since($D, $markD), fn ($n) => $n['kind'] === 'DUE_SOON')), 1, 'v24-new-due-date-reminded-again');
+    $repo->update($colored['id'], ['due_date' => date('Y-m-d', strtotime('+5 days'))], $repo->find($colored['id'])['lock_version'], $R);
+    $markD = $notes24->latestId($D);
+    $notes24->remindDue(true);
+    same($notes24->since($D, $markD), [], 'v24-far-due-date-not-reminded');
+    same($notes24->remindDue(false) + $notes24->remindDue(false), 0, 'v24-auto-scan-throttled');
+    $before = (new AnnotationRepository($c))->countAssigned($D);
+    $projects24->setArchived($A, $D, true);
+    same((new AnnotationRepository($c))->countAssigned($D) < $before, true, 'v24-my-tasks-exclude-archived');
+    $projects24->setArchived($A, $D, false);
+
     echo "-- Tìm kiếm và xuất danh sách\n";
     $open = $repo->search($A, 'OPEN');
     same(count(array_filter($open, fn ($a) => $a['status'] !== 'OPEN')), 0, 'search-open-only');

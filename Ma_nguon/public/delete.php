@@ -33,7 +33,7 @@ try {
         case 'project':
             $projectId = intField($_POST, 'project_id');
             $back = '/project.php?id=' . $projectId;
-            Access::require($c, $user['id'], $projectId, Access::ADMIN);
+            Access::require($c, $user['id'], $projectId, Access::ADMIN, true);
             (new ProjectRepository($c))->delete($projectId, $user['id'], field($_POST, 'confirm_name'));
             flash('Đã xoá dự án.');
             redirect('/projects.php');

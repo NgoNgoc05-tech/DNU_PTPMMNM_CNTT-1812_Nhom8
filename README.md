@@ -18,13 +18,15 @@ mỗi góp ý có **ưu tiên, nhãn, người phụ trách, hạn và ghi chú 
 và **lịch tiếng Việt** cho hạn xử lý theo dạng tháng/ngày/năm.
 **Bản 2.3** thêm công cụ **mũi tên / vẽ tay**, **ảnh chụp đính kèm** trong trả lời (dán bằng Ctrl+V), chế độ **Tô chỗ khác** tự tìm vùng
 thay đổi giữa hai phiên bản, **thông báo tức thời**, **quên mật khẩu** (link 30 phút) và trang **quản trị hệ thống**.
+**Bản 2.4** thêm **tìm kiếm / lọc / sắp xếp / lưu trữ dự án**, **màu nét vẽ**, **nhắc hạn trước 24 giờ**, **trao đổi theo luồng**,
+hộp xác nhận giữa màn hình và thống nhất tên “Việc của tôi”.
 Xem [CHANGELOG](CHANGELOG.md).
 
 ## Chức năng
 
 | # | Chức năng (theo đề tài) | Bổ sung ở bản 2.0 | Ở đâu |
 |---|---|---|---|
-| 1 | Tạo dự án, mời thành viên, cấp quyền **Chỉ xem / Góp ý / Quản lý**; tải ảnh PNG/JPEG và đặt tên từng màn hình | Bảng tổng quan (thống kê, tiến độ, hoạt động), sửa dự án, đổi tên màn hình, tải ảnh kéo thả | `projects.php`, `project.php` |
+| 1 | Tạo dự án, mời thành viên, cấp quyền **Chỉ xem / Góp ý / Quản lý**; tải ảnh PNG/JPEG và đặt tên từng màn hình | Bảng tổng quan (thống kê, tiến độ, hoạt động), sửa dự án, đổi tên màn hình, tải ảnh kéo thả; tìm/lọc/sắp xếp và **lưu trữ** dự án (2.4) | `projects.php`, `project.php` |
 | 2 | Đặt **điểm** hoặc **vùng chữ nhật**, đánh số vị trí, chọn dấu để xem nhận xét | Ô soạn nổi cạnh dấu, thẻ xem nhanh khi rê chuột, ưu tiên/nhãn/phụ trách/hạn, phím tắt; **mũi tên, vẽ tay** (2.3) | `screen.php` |
 | 3 | Trả lời từng nhận xét, sửa nội dung của mình, **đã xử lý / mở lại**, lọc theo trạng thái và người góp ý | **Ghi chú xử lý**, cảm xúc, @nhắc tên, lọc ưu tiên/nhãn/“giao cho tôi”, tìm kiếm, sắp xếp | `screen.php` |
 | 4 | Tải phiên bản mới, giữ ảnh cũ cùng góp ý; **đặt hai phiên bản cạnh nhau**; ghi nhận phiên bản dùng để kiểm tra sau sửa | Chế độ **thanh trượt**, **chồng mờ** và **tô đỏ chỗ khác** (2.3) | `compare.php` |
@@ -81,6 +83,7 @@ bash lab.sh e2e           # trình duyệt thật: 2 tình huống + phép thử
 | ![Lịch tiếng Việt cho hạn xử lý](Hinh_anh/due-calendar.png) | ![Bộ phận hỗ trợ xử lý yêu cầu](Hinh_anh/support-desk.png) |
 | ![Mũi tên và vẽ tay](Hinh_anh/draw.png) | ![Tô đỏ chỗ khác giữa hai phiên bản](Hinh_anh/diff.png) |
 | ![Ảnh chụp đính kèm trong trả lời](Hinh_anh/attach.png) | ![Quản trị hệ thống](Hinh_anh/admin.png) |
+| ![Tìm, lọc, sắp xếp dự án](Hinh_anh/projects-filter.png) | ![Trao đổi theo luồng](Hinh_anh/thread.png) |
 
 ## Tài liệu
 

@@ -97,6 +97,20 @@ same(NotificationRepository::mentionName('Nguyễn Thu Trang (Thiết kế)'), '
 same([Assistant::local('Làm sao vẽ mũi tên?')['topic'], Assistant::local('quên mật khẩu')['topic'], Assistant::local('khoá tài khoản')['topic']],
     ['Mũi tên, vẽ tay và ảnh đính kèm', 'Hồ sơ và mật khẩu', 'Quản trị hệ thống'], 'assistant-v23-topics');
 
+echo "-- Bản 2.4: tìm kiếm, lọc, sắp xếp dự án (hàm thuần)\n";
+$plist = [
+    ['id' => 1, 'name' => 'FoodNow', 'description' => 'đặt món', 'owner_name' => 'Trang', 'role' => 'ADMIN', 'created_by' => 7, 'archived_at' => null, 'open_items' => 3, 'total_items' => 5, 'last_activity' => '2026-11-01 10:00:00+07', 'created_at' => '2026-10-01'],
+    ['id' => 2, 'name' => 'Cổng sinh viên', 'description' => '', 'owner_name' => 'Trang', 'role' => 'COMMENT', 'created_by' => 8, 'archived_at' => null, 'open_items' => 0, 'total_items' => 4, 'last_activity' => '2026-11-02 09:00:00+07', 'created_at' => '2026-10-02'],
+    ['id' => 3, 'name' => 'Bản cũ', 'description' => 'xong', 'owner_name' => 'Đức', 'role' => 'ADMIN', 'created_by' => 7, 'archived_at' => '2026-10-20', 'open_items' => 0, 'total_items' => 0, 'last_activity' => null, 'created_at' => '2026-09-01'],
+];
+same(array_column(ProjectRepository::filter($plist, [], 7), 'id'), [2, 1], 'v24-active-sorted-by-activity');
+same(array_column(ProjectRepository::filter($plist, ['view' => 'archived'], 7), 'id'), [3], 'v24-archived-view');
+same(array_column(ProjectRepository::filter($plist, ['q' => 'SINH'], 7), 'id'), [2], 'v24-search-name-case-insensitive');
+same(array_column(ProjectRepository::filter($plist, ['role' => 'OWNER'], 7), 'id'), [1], 'v24-filter-owner');
+same(array_column(ProjectRepository::filter($plist, ['state' => 'done'], 7), 'id'), [2], 'v24-filter-all-resolved');
+same(array_column(ProjectRepository::filter($plist, ['sort' => 'open'], 7), 'id'), [1, 2], 'v24-sort-most-open');
+same(array_key_exists('#ef4444', AnnotationRepository::COLORS) && count(AnnotationRepository::COLORS) === 7, true, 'v24-color-palette');
+
 echo "-- Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)\n";
 $tmp = sys_get_temp_dir() . '/pinpoint-unit-' . getmypid();
 @mkdir($tmp);

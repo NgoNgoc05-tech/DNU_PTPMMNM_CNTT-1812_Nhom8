@@ -16,6 +16,7 @@ final class NotificationRepository
         'MENTION' => 'nhắc tới bạn', 'ASSIGNED' => 'giao việc cho bạn', 'REPLY' => 'trả lời', 'STATUS' => 'đổi trạng thái',
         'INVITE' => 'mời bạn tham gia dự án', 'INVITE_REPLY' => 'trả lời lời mời',
         'TICKET' => 'gửi yêu cầu hỗ trợ', 'TICKET_REPLY' => 'trả lời yêu cầu hỗ trợ của bạn',
+        'DUE_SOON' => 'góp ý sắp đến hạn',
     ];
 
     public function __construct(private PgSql\Connection $c)
@@ -96,6 +97,51 @@ final class NotificationRepository
             [$userId, $actorId > 0 ? $actorId : null, $kind, $ticketId, mb_substr($body, 0, 300)]);
     }
 
+    /**
+     * Bản 2.4 — nhắc hạn trước khoảng 24 giờ: góp ý CHƯA XỬ LÝ có hạn là hôm nay hoặc ngày mai, trong dự án đang hoạt động,
+     * gửi cho người phụ trách (chưa giao ai thì gửi người tạo). Mỗi hạn chỉ nhắc một lần (annotations.due_reminded_for);
+     * đổi sang hạn khác thì sẽ được nhắc lại. Email gửi thêm nếu máy chủ cấu hình thư và người nhận bật tuỳ chọn ở Hồ sơ.
+     * Không cần cron: được gọi khi có người dùng mở trang (tối đa 10 phút một lần); có thể chạy tay php tools/reminders.php.
+     * @return int số lời nhắc đã gửi
+     */
+    public function remindDue(bool $force = false): int
+    {
+        if (!$force) {
+            $go = fetchOne($this->c,
+                "INSERT INTO app_state (key, value, updated_at) VALUES ('due_scan', '', now())
+                 ON CONFLICT (key) DO UPDATE SET updated_at = now() WHERE app_state.updated_at < now() - interval '10 minutes'
+                 RETURNING key");
+            if ($go === null) {
+                return 0;
+            }
+        }
+        $rows = fetchAll($this->c,
+            "SELECT a.id, a.due_date, a.seq_no, COALESCE(a.assignee_id, a.created_by) AS uid, u.email, u.name, u.email_reminders,
+                    s.name AS screen_name, v.version_no, p.name AS project_name, rc.body,
+                    (a.due_date = CURRENT_DATE) AS today
+               FROM annotations a
+               JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id JOIN projects p ON p.id = s.project_id
+               JOIN users u ON u.id = COALESCE(a.assignee_id, a.created_by)
+               JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = u.id
+               JOIN comments rc ON rc.annotation_id = a.id AND rc.parent_id IS NULL
+              WHERE a.status = 'OPEN' AND p.archived_at IS NULL AND u.locked_at IS NULL
+                AND a.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 1
+                AND a.due_reminded_for IS DISTINCT FROM a.due_date
+              ORDER BY a.id LIMIT 500");
+        foreach ($rows as $r) {
+            $when = ($r['today'] === 't' ? 'Hạn hôm nay' : 'Hạn ngày mai') . ' (' . date('m/d/Y', (int) strtotime($r['due_date'])) . ')';
+            queryParams($this->c, 'INSERT INTO notifications (user_id, actor_id, kind, annotation_id, body) VALUES ($1, NULL, $2, $3, $4)',
+                [(int) $r['uid'], 'DUE_SOON', (int) $r['id'], mb_substr($when . ' · ' . $r['body'], 0, 300)]);
+            queryParams($this->c, 'UPDATE annotations SET due_reminded_for = due_date WHERE id = $1', [(int) $r['id']]);
+            if ($r['email_reminders'] === 't' && Mailer::configured()) {
+                Mailer::send($r['email'], 'Pinpoint — góp ý sắp đến hạn',
+                    "Chào {$r['name']},\n\n$when: {$r['project_name']} · {$r['screen_name']} v{$r['version_no']} #{$r['seq_no']}\n“"
+                    . mb_substr($r['body'], 0, 200) . "”\n\nMở: " . PasswordReset::baseUrl() . '/inbox.php' . "\n");
+            }
+        }
+        return count($rows);
+    }
+
     public function unreadCount(int $userId): int
     {
         return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [$userId])['n'];
@@ -132,7 +178,7 @@ final class NotificationRepository
             'id' => (int) $r['id'], 'kind' => $r['kind'], 'annotation_id' => $r['annotation_id'] === null ? null : (int) $r['annotation_id'],
             'version_id' => $r['version_id'] === null ? null : (int) $r['version_id'], 'label' => self::KINDS[$r['kind']], 'body' => $r['body'],
             'created_at' => $r['created_at'], 'read' => $r['read_at'] !== null,
-            'actor' => $r['actor'] ?? (in_array($r['kind'], ['TICKET_REPLY'], true) ? 'Bộ phận hỗ trợ' : null), 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
+            'actor' => $r['actor'] ?? match ($r['kind']) { 'TICKET_REPLY' => 'Bộ phận hỗ trợ', 'DUE_SOON' => '⏰ Nhắc hạn', default => null }, 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
             'link' => match (true) {
                 $r['kind'] === 'INVITE' => '/projects.php#invites',
                 $r['kind'] === 'TICKET' => '/support_admin.php#t' . (int) $r['ticket_id'],

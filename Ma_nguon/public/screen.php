@@ -104,6 +104,13 @@ require __DIR__ . '/../templates/header.php';
 <button type="button" data-tool="arrow" aria-pressed="false" aria-label="Vẽ mũi tên"><?= icon('arrow-tool') ?>Mũi tên<span class="tip">Kéo từ đuôi tới đầu mũi tên<kbd>A</kbd></span></button>
 <button type="button" data-tool="draw" aria-pressed="false" aria-label="Vẽ tay"><?= icon('pen') ?>Vẽ tay<span class="tip">Giữ chuột và vẽ tự do<kbd>D</kbd></span></button>
 </div>
+<details class="color-pick" id="color-pick">
+<summary aria-label="Màu nét vẽ" title="Màu cho vùng, mũi tên, vẽ tay"><span class="swatch-now" id="swatch-now"></span><?= icon('palette') ?></summary>
+<div class="color-pop" role="group" aria-label="Chọn màu nét">
+<button type="button" class="swatch swatch-auto" data-color="" aria-pressed="true" title="Mặc định (theo trạng thái)" aria-label="Màu mặc định"></button>
+<?php foreach (AnnotationRepository::COLORS as $hex => $name): ?><button type="button" class="swatch" data-color="<?= $hex ?>" data-swatch="<?= substr($hex, 1) ?>" aria-pressed="false" title="<?= e($name) ?>" aria-label="Màu <?= e(mb_strtolower($name)) ?>"></button><?php endforeach; ?>
+</div>
+</details>
 <span class="sep"></span>
 <?php endif; ?>
 <button type="button" data-zoom="out" aria-label="Thu nhỏ"><?= icon('minus') ?><span class="tip">Thu nhỏ<kbd>−</kbd></span></button>

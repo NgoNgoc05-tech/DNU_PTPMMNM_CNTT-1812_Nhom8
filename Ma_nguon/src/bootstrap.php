@@ -18,6 +18,7 @@ require_once __DIR__ . '/NotificationRepository.php';
 require_once __DIR__ . '/SupportRepository.php';
 require_once __DIR__ . '/Assistant.php';
 require_once __DIR__ . '/AttachmentRepository.php';
+require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/PasswordReset.php';
 require_once __DIR__ . '/AdminRepository.php';
 require_once __DIR__ . '/Export.php';
@@ -68,6 +69,9 @@ function errorMessage(string $code): string
         'ACCOUNT_LOCKED' => 'Tài khoản này đang bị khoá. Hãy liên hệ quản trị viên.',
         'CANNOT_CHANGE_SELF' => 'Không thể tự khoá hoặc tự bỏ quyền quản trị của chính mình.',
         'LAST_ADMIN' => 'Hệ thống cần ít nhất một quản trị viên.',
+        'PROJECT_ARCHIVED' => 'Dự án đã được lưu trữ nên chỉ xem. Quản lý dự án có thể khôi phục để tiếp tục góp ý.',
+        'COLOR_INVALID' => 'Màu không hợp lệ.',
+        'REPLY_TARGET_INVALID' => 'Tin bạn muốn trả lời không còn trong góp ý này.',
         'UNAUTHENTICATED' => 'Phiên đăng nhập đã hết. Hãy đăng nhập lại.',
     ][$code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }

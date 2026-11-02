@@ -42,9 +42,71 @@
     el.addEventListener('focus', function () { el.select(); });
     el.addEventListener('click', function () { el.select(); });
   });
-  document.querySelectorAll('form[data-confirm]').forEach(function (form) {
-    form.addEventListener('submit', function (e) { if (!window.confirm(form.dataset.confirm)) { e.preventDefault(); } });
+  // Bản 2.4: lọc danh sách dự án ngay khi gõ (Enter để tìm ở máy chủ, giữ lại khi tải lại trang).
+  document.querySelectorAll('input[data-live-filter]').forEach(function (input) {
+    var cards = document.querySelectorAll('.project-card[data-name]');
+    var empty = document.getElementById('live-empty');
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      var shown = 0;
+      cards.forEach(function (c) { var ok = !q || c.dataset.name.indexOf(q) !== -1; c.hidden = !ok; if (ok) { shown++; } });
+      if (empty) { empty.hidden = shown !== 0 || cards.length === 0; }
+    });
   });
+
+  // Bản 2.4: hộp xác nhận của ứng dụng, hiện giữa màn hình (thay hộp confirm() của trình duyệt).
+  // Dùng cho form có data-confirm hoặc nút gửi có data-confirm. Nội dung gán bằng textContent.
+  function confirmBox(message, danger) {
+    return new Promise(function (resolve) {
+      var d = document.createElement('dialog');
+      d.className = 'modal confirm-dialog';
+      d.setAttribute('aria-labelledby', 'confirm-title');
+      var body = document.createElement('div');
+      body.className = 'confirm-body';
+      var ic = document.createElement('span');
+      ic.className = 'confirm-icon' + (danger ? ' is-danger' : '');
+      ic.textContent = danger ? '!' : '?';
+      var txt = document.createElement('div');
+      var h = document.createElement('h2');
+      h.id = 'confirm-title';
+      h.textContent = danger ? 'Xác nhận xoá' : 'Xác nhận';
+      var p = document.createElement('p');
+      p.textContent = message;
+      txt.appendChild(h); txt.appendChild(p);
+      body.appendChild(ic); body.appendChild(txt);
+      var foot = document.createElement('div');
+      foot.className = 'modal-foot';
+      var no = document.createElement('button');
+      no.type = 'button'; no.className = 'btn btn-ghost'; no.textContent = 'Huỷ';
+      var yes = document.createElement('button');
+      yes.type = 'button'; yes.className = 'btn ' + (danger ? 'btn-danger-solid' : ''); yes.textContent = danger ? 'Xoá' : 'Đồng ý';
+      yes.setAttribute('data-confirm-ok', '');
+      foot.appendChild(no); foot.appendChild(yes);
+      d.appendChild(body); d.appendChild(foot);
+      document.body.appendChild(d);
+      var done = function (v) { d.close(); d.remove(); resolve(v); };
+      no.addEventListener('click', function () { done(false); });
+      yes.addEventListener('click', function () { done(true); });
+      d.addEventListener('cancel', function (e) { e.preventDefault(); done(false); });
+      d.addEventListener('click', function (e) { if (e.target === d) { done(false); } }); // bấm ra ngoài = huỷ
+      d.showModal();
+      (danger ? no : yes).focus();
+    });
+  }
+  window.PinConfirm = confirmBox;
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    var btn = e.submitter;
+    var msg = (btn && btn.dataset && btn.dataset.confirm) || form.dataset.confirm;
+    if (!msg || form.dataset.confirmed === '1') { delete form.dataset.confirmed; return; }
+    e.preventDefault();
+    var danger = /^(Xoá|Xóa|Huỷ lời mời|Khoá)/.test(msg) || form.hasAttribute('data-confirm-danger');
+    confirmBox(msg, danger).then(function (ok) {
+      if (!ok) { return; }
+      form.dataset.confirmed = '1';
+      if (form.requestSubmit) { form.requestSubmit(btn || undefined); } else { form.submit(); }
+    });
+  }, true);
 
   // Hộp thoại: nút có data-open="id-dialog" mở <dialog>; data-close đóng.
   document.querySelectorAll('[data-open]').forEach(function (b) {

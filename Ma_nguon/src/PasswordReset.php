@@ -125,17 +125,12 @@ final class PasswordReset
 
     public static function mailConfigured(): bool
     {
-        $from = getenv('PINPOINT_MAIL_FROM');
-        return is_string($from) && filter_var($from, FILTER_VALIDATE_EMAIL) !== false;
+        return Mailer::configured();
     }
 
     private static function sendMail(string $to, string $name, string $link): bool
     {
-        $from = (string) getenv('PINPOINT_MAIL_FROM');
-        $subject = '=?UTF-8?B?' . base64_encode('Pinpoint — đặt lại mật khẩu') . '?=';
-        $body = "Chào $name,\r\n\r\nBạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu Pinpoint. Mở link sau trong " . self::TTL_MINUTES
-            . " phút để đặt mật khẩu mới (link chỉ dùng được một lần):\r\n\r\n$link\r\n\r\nNếu bạn không yêu cầu, hãy bỏ qua thư này; mật khẩu cũ vẫn giữ nguyên.\r\n";
-        $headers = "From: Pinpoint <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
-        return @mail($to, $subject, $body, $headers);
+        return Mailer::send($to, 'Pinpoint — đặt lại mật khẩu', "Chào $name,\n\nBạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu Pinpoint. Mở link sau trong "
+            . self::TTL_MINUTES . " phút để đặt mật khẩu mới (link chỉ dùng được một lần):\n\n$link\n\nNếu bạn không yêu cầu, hãy bỏ qua thư này; mật khẩu cũ vẫn giữ nguyên.\n");
     }
 }
