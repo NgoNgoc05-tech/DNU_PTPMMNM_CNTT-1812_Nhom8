@@ -93,7 +93,7 @@ require __DIR__ . '/../templates/header.php';
 </div>
 <div class="card" id="reminders">
 <h2><?= icon('clock') ?>Nhắc hạn xử lý</h2>
-<p class="hint">Góp ý chưa xử lý giao cho bạn (hoặc do bạn tạo nhưng chưa giao ai) có hạn <strong>hôm nay hoặc ngày mai</strong> sẽ được nhắc một lần trong chuông 🔔.</p>
+<p class="hint">Góp ý chưa xử lý giao cho bạn (hoặc do bạn tạo nhưng chưa giao ai) có hạn <strong>hôm nay hoặc ngày mai</strong> sẽ được nhắc một lần trong chuông <?= icon('bell', 'sm') ?>.</p>
 <form method="post" action="/profile.php">
 <?= csrfField() ?>
 <input type="hidden" name="action" value="reminders">

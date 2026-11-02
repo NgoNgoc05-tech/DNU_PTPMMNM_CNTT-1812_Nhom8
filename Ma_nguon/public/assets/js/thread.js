@@ -8,6 +8,13 @@
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICONS = {
+    'eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    'thumb-up': '<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M7 10l4-7a2.5 2.5 0 0 1 3 3l-1 4h5.5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 21H7"/>',
+    'heart': '<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/>',
+    'party': '<path d="M4 20 9 7l8 8z"/><path d="M14 4v2M19 9h2M17.5 6.5 19 5M12.5 9.5c1.5-1.5 3.5-1.5 5 0"/>',
+    'wave': '<path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M10 10.5V5a1.5 1.5 0 0 1 3 0v5.5"/><path d="M13 10.5V6.5a1.5 1.5 0 0 1 3 0V13"/><path d="M16 11a1.5 1.5 0 0 1 3 0v3a7 7 0 0 1-7 7h-.5A6.5 6.5 0 0 1 5 16.2L3.4 13a1.5 1.5 0 0 1 2.6-1.5L7 13"/>',
+    'swap': '<path d="m8 7-4 5 4 5M16 7l4 5-4 5M4 12h16"/>',
+    'dot': '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     'archive': '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>',
     'palette': '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-.9-.8-1.3-.8-2.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
     'reply': '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
@@ -141,7 +148,8 @@
   var STATUS = { OPEN: 'Chưa xử lý', RESOLVED: 'Đã xử lý' };
   var PRIORITY = { LOW: 'Thấp', MEDIUM: 'Trung bình', HIGH: 'Cao', URGENT: 'Khẩn cấp' };
   var CATEGORY = { LAYOUT: 'Bố cục', COLOR: 'Màu sắc', TYPO: 'Chữ & phông', CONTENT: 'Nội dung', UX: 'Trải nghiệm', A11Y: 'Trợ năng', OTHER: 'Khác' };
-  var REACTIONS = { LIKE: '👍', HEART: '❤️', PARTY: '🎉', EYES: '👀' };
+  // Cảm xúc dùng icon SVG (không dùng emoji để hiển thị giống nhau trên mọi máy).
+  var REACTIONS = { LIKE: ['thumb-up', 'Thích'], HEART: ['heart', 'Yêu thích'], PARTY: ['party', 'Chúc mừng'], EYES: ['eye', 'Đang xem'] };
   var PRIO_RANK = { URGENT: 1, HIGH: 2, MEDIUM: 3, LOW: 4 };
 
   function badge(status) { return el('span', { class: 'badge ' + (status === 'OPEN' ? 'badge-open' : 'badge-resolved'), 'data-status': status, text: STATUS[status] }); }
@@ -586,7 +594,7 @@
         if (!rc.area.value.trim() && !picked.length) { return; }
         btn.disabled = true;
         var api = self.opt.api;
-        api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value.trim() || '📎 Ảnh đính kèm', reply_to_id: self.replyTo ? self.replyTo.id : undefined })
+        api.post({ action: 'reply', annotation_id: a.id, body: rc.area.value.trim() || 'Ảnh đính kèm', reply_to_id: self.replyTo ? self.replyTo.id : undefined })
           .then(function (res) {
             // Tải lần lượt từng ảnh; ảnh lỗi không làm mất trả lời đã gửi.
             var failed = 0;
@@ -738,14 +746,16 @@
     var row = el('div', { class: 'c-actions' });
     (c.reactions || []).forEach(function (r) {
       row.appendChild(el('button', { type: 'button', class: 'reaction' + (r.mine ? ' is-mine' : ''), title: r.names.join(', '),
-        'data-reaction': r.kind, disabled: cfg.canComment ? null : 'disabled', onclick: function () { self.react(c, r.kind); } },
-        [r.emoji + ' ', String(r.count)]));
+        'data-reaction': r.kind, 'aria-label': (REACTIONS[r.kind] ? REACTIONS[r.kind][1] : r.kind) + ': ' + r.count,
+        disabled: cfg.canComment ? null : 'disabled', onclick: function () { self.react(c, r.kind); } },
+        [icon(REACTIONS[r.kind] ? REACTIONS[r.kind][0] : 'smile'), String(r.count)]));
     });
     if (cfg.canComment) {
       var picker = el('details', { class: 'dropdown react-picker' }, [
         el('summary', { class: 'btn btn-xs btn-subtle', title: 'Thả cảm xúc', 'aria-label': 'Thả cảm xúc' }, [icon('smile')]),
         el('div', { class: 'menu' }, Object.keys(REACTIONS).map(function (k) {
-          return el('button', { type: 'button', title: k, text: REACTIONS[k], onclick: function () { picker.removeAttribute('open'); self.react(c, k); } });
+          return el('button', { type: 'button', class: 'react-' + k, title: REACTIONS[k][1], 'aria-label': REACTIONS[k][1],
+            onclick: function () { picker.removeAttribute('open'); self.react(c, k); } }, [icon(REACTIONS[k][0])]);
         }))
       ]);
       row.appendChild(picker);
@@ -826,7 +836,7 @@
   };
 
   /**
-   * Chọn ảnh đính kèm cho ô trả lời (bản 2.3): nút 📎, kéo thả hoặc dán ảnh chụp màn hình (Ctrl+V).
+   * Chọn ảnh đính kèm cho ô trả lời (bản 2.3): nút Ảnh (kẹp giấy), kéo thả hoặc dán ảnh chụp màn hình (Ctrl+V).
    * Ảnh xem trước đọc bằng FileReader (data:), hợp với CSP img-src 'self' data:.
    */
   var ATTACH_MAX = 4;

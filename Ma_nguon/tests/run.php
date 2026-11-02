@@ -111,6 +111,32 @@ same(array_column(ProjectRepository::filter($plist, ['state' => 'done'], 7), 'id
 same(array_column(ProjectRepository::filter($plist, ['sort' => 'open'], 7), 'id'), [1, 2], 'v24-sort-most-open');
 same(array_key_exists('#ef4444', AnnotationRepository::COLORS) && count(AnnotationRepository::COLORS) === 7, true, 'v24-color-palette');
 
+echo "-- Bản 2.5: phân trang dùng chung\n";
+$pgA = new Paginator(135, 4, 20);
+same([$pgA->pages, $pgA->offset(), $pgA->from(), $pgA->to()], [7, 60, 61, 80], 'v25-pager-math');
+same($pgA->window(), [1, 2, 3, 4, 5, 6, 7], 'v25-pager-window-all-pages');
+same((new Paginator(500, 10, 20))->window(), [1, 0, 8, 9, 10, 11, 12, 0, 25], 'v25-pager-window-middle');
+same([(new Paginator(0, 5, 20))->page, (new Paginator(0, 5, 20))->from(), (new Paginator(30, 99, 20))->page], [1, 0, 2], 'v25-pager-clamps-page');
+same(Paginator::fromRequest(100, ['page' => '2', 'per' => '999'], 20)->perPage, 20, 'v25-pager-per-whitelist');
+$html = (new Paginator(135, 2, 20))->render('/issues.php', ['project' => 3, 'q' => '<b>', 'status' => ''], 'góp ý');
+same([str_contains($html, 'Hiển thị <strong>21–40</strong> trên <strong>135</strong> góp ý'), str_contains($html, 'q=%3Cb%3E'),
+    str_contains($html, '<b>'), str_contains($html, 'status=')], [true, true, false, false], 'v25-pager-render-escaped-keeps-filters');
+same(str_contains((new Paginator(40, 1, 15, [15], 'apage'))->render('/x.php', ['page' => 2], 'hoạt động', true, '#activity'), 'page=2&amp;apage=2#activity'), true, 'v25-pager-second-list-own-key');
+
+// Giao diện chỉ dùng icon SVG, không dùng emoji (emoji hiển thị khác nhau giữa Windows, macOS, Android).
+$emojiFiles = [];
+foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__ . '/../public')) as $f) {
+    if (preg_match('/\.(php|js|css)$/', $f->getFilename()) && preg_match('/[\x{1F000}-\x{1FFFF}\x{2600}-\x{26FF}\x{2B00}-\x{2BFF}\x{23E9}-\x{23FA}\x{FE0F}]/u', (string) file_get_contents($f->getPathname()))) {
+        $emojiFiles[] = $f->getFilename();
+    }
+}
+foreach (['Assistant.php', 'NotificationRepository.php', 'AnnotationRepository.php', 'View.php'] as $f) {
+    if (preg_match('/[\x{1F000}-\x{1FFFF}\x{2600}-\x{26FF}\x{23E9}-\x{23FA}\x{FE0F}]/u', (string) file_get_contents(__DIR__ . "/../src/$f"))) {
+        $emojiFiles[] = $f;
+    }
+}
+same($emojiFiles, [], 'v25-no-emoji-in-ui-svg-icons-only');
+
 echo "-- Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)\n";
 $tmp = sys_get_temp_dir() . '/pinpoint-unit-' . getmypid();
 @mkdir($tmp);

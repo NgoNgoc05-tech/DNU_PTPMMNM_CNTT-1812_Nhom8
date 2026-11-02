@@ -20,9 +20,12 @@ $more = [
     'priority' => field($_GET, 'priority'), 'category' => field($_GET, 'category'), 'assignee' => intField($_GET, 'assignee'),
     'overdue' => field($_GET, 'overdue') === '1', 'sort' => field($_GET, 'sort'),
 ];
-$items = $repo->search($projectId, $status, $author, $q, $screen, $more);
+// Bản 2.5: đếm rồi chỉ lấy một trang (25/50/100 góp ý) — dự án lớn vẫn mở nhanh.
+$pg = Paginator::fromRequest($repo->countSearch($projectId, $status, $author, $q, $screen, $more), $_GET, 25, [25, 50, 100]);
+$items = $repo->search($projectId, $status, $author, $q, $screen, $more + ['limit' => $pg->perPage, 'offset' => $pg->offset()]);
 $stats = $repo->stats($projectId);
-$activity = $repo->activity($projectId, 40);
+$apg = Paginator::fromRequest($repo->countActivity($projectId), $_GET, 15, [15], 'apage');
+$activity = $repo->activity($projectId, $apg->perPage, 0, $apg->offset());
 $query = http_build_query(array_filter(['project' => $projectId, 'status' => $status, 'author' => $author, 'screen' => $screen, 'q' => $q,
     'priority' => $more['priority'], 'category' => $more['category'], 'assignee' => $more['assignee'],
     'overdue' => $more['overdue'] ? '1' : '', 'sort' => $more['sort']], fn ($v) => $v !== '' && $v !== 0));
@@ -38,7 +41,7 @@ require __DIR__ . '/../templates/header.php';
 <h1>Tìm góp ý</h1><p>Lọc theo trạng thái, người góp ý, ưu tiên, nhãn, người phụ trách, hạn và nội dung. Xuất đúng danh sách đang lọc.</p></div>
 <div class="actions">
 <button type="button" class="btn btn-ghost" data-print><?= icon('printer') ?>In / PDF</button>
-<a class="btn" href="/export.php?<?= e($query) ?>"><?= icon('download') ?>Xuất CSV (<?= count($items) ?> dòng)</a>
+<a class="btn" href="/export.php?<?= e($query) ?>"><?= icon('download') ?>Xuất CSV (<?= $pg->total ?> dòng)</a>
 </div>
 </div>
 <p class="only-print"><strong><?= e($project['name']) ?></strong> — danh sách góp ý, in lúc <?= e(date('d/m/Y H:i')) ?></p>
@@ -47,11 +50,12 @@ require __DIR__ . '/../templates/header.php';
 <a class="stat" href="<?= $base ?>&amp;status=OPEN"><span class="stat-icon pin"><?= icon('pin') ?></span><span><strong><?= $stats['open'] ?></strong><span>Chưa xử lý</span></span></a>
 <a class="stat" href="<?= $base ?>&amp;status=RESOLVED"><span class="stat-icon ok"><?= icon('check-circle') ?></span><span><strong><?= $stats['resolved'] ?></strong><span>Đã xử lý · <?= $stats['progress'] ?>%</span></span></a>
 <a class="stat" href="<?= $base ?>&amp;overdue=1"><span class="stat-icon danger"><?= icon('clock') ?></span><span><strong><?= $stats['overdue'] ?></strong><span>Quá hạn</span></span></a>
-<a class="stat" href="<?= $base ?>&amp;status=OPEN&amp;assignee=<?= (int) $user['id'] ?>"><span class="stat-icon"><?= icon('user') ?></span><span><strong><?= count($repo->search($projectId, 'OPEN', 0, '', 0, ['assignee' => (int) $user['id']])) ?></strong><span>Giao cho tôi</span></span></a>
+<a class="stat" href="<?= $base ?>&amp;status=OPEN&amp;assignee=<?= (int) $user['id'] ?>"><span class="stat-icon"><?= icon('user') ?></span><span><strong><?= $repo->countSearch($projectId, 'OPEN', 0, '', 0, ['assignee' => (int) $user['id']]) ?></strong><span>Giao cho tôi</span></span></a>
 </div>
 
 <form method="get" action="/issues.php" class="filter-bar mt">
 <input type="hidden" name="project" value="<?= $projectId ?>">
+<input type="hidden" name="per" value="<?= $pg->perPage ?>">
 <div class="grow"><label for="q">Nội dung / ghi chú chứa</label><div class="input-icon"><?= icon('search') ?><input id="q" name="q" type="search" value="<?= e($q) ?>" maxlength="100" placeholder="Ví dụ: nút, màu, khoảng cách…"></div></div>
 <div><label for="status">Trạng thái</label><select id="status" name="status">
 <option value="">Tất cả</option><option value="OPEN"<?= $sel($status, 'OPEN') ?>>Chưa xử lý</option><option value="RESOLVED"<?= $sel($status, 'RESOLVED') ?>>Đã xử lý</option></select></div>
@@ -72,7 +76,7 @@ require __DIR__ . '/../templates/header.php';
 <?php if ($filtered): ?><a class="btn btn-subtle" href="<?= $base ?>"><?= icon('x') ?>Xoá lọc</a><?php endif; ?>
 </form>
 
-<div class="section-title"><h2><?= icon('chat') ?>Kết quả <span class="count"><?= count($items) ?></span></h2></div>
+<div class="section-title"><h2><?= icon('chat') ?>Kết quả <span class="count"><?= $pg->total ?></span></h2></div>
 <?php if ($items === []): ?>
 <div class="card empty-state"><div class="empty-art"><?= icon('search') ?></div><h3>Không có góp ý phù hợp</h3><p class="empty">Không có góp ý phù hợp.</p></div>
 <?php else: ?>
@@ -94,20 +98,23 @@ require __DIR__ . '/../templates/header.php';
 <td><?= statusBadge($a['status']) ?><?= $a['resolved_on_version_no'] ? '<br><span class="hint">kiểm tra trên v' . $a['resolved_on_version_no'] . '</span>' : '' ?></td>
 <td class="nowrap"><?= avatar($a['author'], $a['author_id'], 'sm') ?> <?= e(trim((string) preg_replace('/\(.*?\)/u', '', $a['author']))) ?></td>
 <td class="num coord"><?= match ($a['shape']) {
-    'POINT' => '● (' . e($a['x']) . '; ' . e($a['y']) . ')',
-    'RECT' => '▭ (' . e($a['x']) . '; ' . e($a['y']) . ') ' . e($a['w']) . '×' . e($a['h']),
-    'ARROW' => '➝ (' . e($a['points'][0][0]) . '; ' . e($a['points'][0][1]) . ') → (' . e($a['points'][1][0]) . '; ' . e($a['points'][1][1]) . ')',
-    default => '✎ ' . count($a['points'] ?? []) . ' điểm từ (' . e($a['x']) . '; ' . e($a['y']) . ')',
+    'POINT' => icon('pin', 'sm') . ' (' . e($a['x']) . '; ' . e($a['y']) . ')',
+    'RECT' => icon('square', 'sm') . ' (' . e($a['x']) . '; ' . e($a['y']) . ') ' . e($a['w']) . '×' . e($a['h']),
+    'ARROW' => icon('arrow-tool', 'sm') . ' (' . e($a['points'][0][0]) . '; ' . e($a['points'][0][1]) . ') → (' . e($a['points'][1][0]) . '; ' . e($a['points'][1][1]) . ')',
+    default => icon('pen', 'sm') . ' ' . count($a['points'] ?? []) . ' điểm từ (' . e($a['x']) . '; ' . e($a['y']) . ')',
 } ?></td>
 </tr>
 <?php endforeach; ?>
 </tbody>
 </table>
 </div>
+<?= $pg->render('/issues.php', ['project' => $projectId, 'status' => $status, 'author' => $author, 'screen' => $screen, 'q' => $q,
+    'priority' => $more['priority'], 'category' => $more['category'], 'assignee' => $more['assignee'], 'overdue' => $more['overdue'] ? '1' : '',
+    'sort' => $more['sort']], 'góp ý') ?>
 <?php endif; ?>
 
 <div class="card mt" id="activity">
-<div class="section-title"><h2><?= icon('history') ?>Lịch sử hoạt động gần đây</h2><span class="hint">40 thay đổi mới nhất trong dự án</span></div>
+<div class="section-title"><h2><?= icon('history') ?>Lịch sử hoạt động gần đây</h2><span class="hint">Mọi thay đổi trong dự án, mới nhất trước</span></div>
 <?php if ($activity === []): ?>
 <p class="hint">Chưa có hoạt động.</p>
 <?php else: ?>
@@ -119,6 +126,9 @@ require __DIR__ . '/../templates/header.php';
 <time><?= e(dateVi($ev['created_at'])) ?> · <?= e(ago($ev['created_at'])) ?></time></span></li>
 <?php endforeach; ?>
 </ul>
+<?= $apg->render('/issues.php', ['project' => $projectId, 'status' => $status, 'author' => $author, 'screen' => $screen, 'q' => $q,
+    'priority' => $more['priority'], 'category' => $more['category'], 'assignee' => $more['assignee'], 'overdue' => $more['overdue'] ? '1' : '',
+    'sort' => $more['sort'], 'page' => $pg->page, 'per' => $pg->perPage], 'hoạt động', false, '#activity') ?>
 <?php endif; ?>
 </div>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

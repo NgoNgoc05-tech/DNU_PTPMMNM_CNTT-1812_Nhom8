@@ -298,6 +298,25 @@ try {
     [$st, , $html] = $adminB->request('GET', '/admin.php?tab=projects');
     same([$st, str_contains($html, 'id="admin-projects"')], [200, true], 'http-admin-projects-tab');
 
+    echo "-- Bản 2.5: phân trang qua HTTP\n";
+    $A25 = $fx['projects']['A'];
+    $rowsOf = fn (string $h) => preg_match_all('/class="seq-link/', $h);
+    [$st, , $h1] = $designer->request('GET', "/issues.php?project=$A25&per=25&page=1");
+    $total25 = (new AnnotationRepository($c))->countSearch($A25);
+    same([$st, $rowsOf($h1), str_contains($h1, 'class="pager"'), str_contains($h1, "trên <strong>$total25</strong> góp ý")], [200, min(25, $total25), true, true], 'http-issues-paged');
+    [$st, , $hx] = $designer->request('GET', "/issues.php?project=$A25&page=-5&per=abc&apage=xyz");
+    same([$st, $rowsOf($hx)], [200, min(25, $total25)], 'http-bad-page-values-safe');
+    [$st, , $hp] = $designer->request('GET', '/projects.php?per=9&page=99');
+    same([$st, str_contains($hp, 'class="pager"')], [200, true], 'http-projects-page-out-of-range-clamped');
+    [$st, , $hn] = $designer->request('GET', '/notifications.php?page=2&per=10');
+    same($st, 200, 'http-notifications-paged');
+    [$st, , $ha] = $adminB->request('GET', '/admin.php?tab=users&per=10&page=1&sort=active');
+    same([$st, str_contains($ha, 'class="pager"')], [200, true], 'http-admin-users-paged');
+    [$st, , $hl] = $adminB->request('GET', '/admin.php?tab=log');
+    same([$st, str_contains($hl, 'id="admin-log"')], [200, true], 'http-admin-log-tab');
+    [$st, , $hs] = $adminB->request('GET', '/support_admin.php?status=ALL');
+    same($st, 200, 'http-support-desk-all-paged');
+
     $multipart = "--$boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{$designer->csrf}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"screen_id\"\r\n\r\n{$first['screen_id']}\r\n"
         . "--$boundary\r\nContent-Disposition: form-data; name=\"image\"; filename=\"evil.png\"\r\nContent-Type: image/png\r\n\r\n<?php system('id'); ?>\r\n"

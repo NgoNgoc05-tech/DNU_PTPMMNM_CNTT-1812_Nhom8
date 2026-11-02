@@ -20,6 +20,8 @@ và **lịch tiếng Việt** cho hạn xử lý theo dạng tháng/ngày/năm.
 thay đổi giữa hai phiên bản, **thông báo tức thời**, **quên mật khẩu** (link 30 phút) và trang **quản trị hệ thống**.
 **Bản 2.4** thêm **tìm kiếm / lọc / sắp xếp / lưu trữ dự án**, **màu nét vẽ**, **nhắc hạn trước 24 giờ**, **trao đổi theo luồng**,
 hộp xác nhận giữa màn hình và thống nhất tên “Việc của tôi”.
+**Bản 2.5** chuẩn bị cho quy mô **~100 người dùng**: lọc/sắp xếp/**phân trang ngay trong CSDL** ở mọi danh sách, thêm chỉ mục,
+tự dọn dữ liệu cũ, công cụ nạp dữ liệu thử tải và đo tốc độ (trang chậm nhất < 10 ms), cùng giao diện nhiều màu hơn — mục đang chọn luôn có màu, toàn bộ emoji thay bằng icon SVG.
 Xem [CHANGELOG](CHANGELOG.md).
 
 ## Chức năng
@@ -84,6 +86,7 @@ bash lab.sh e2e           # trình duyệt thật: 2 tình huống + phép thử
 | ![Mũi tên và vẽ tay](Hinh_anh/draw.png) | ![Tô đỏ chỗ khác giữa hai phiên bản](Hinh_anh/diff.png) |
 | ![Ảnh chụp đính kèm trong trả lời](Hinh_anh/attach.png) | ![Quản trị hệ thống](Hinh_anh/admin.png) |
 | ![Tìm, lọc, sắp xếp dự án](Hinh_anh/projects-filter.png) | ![Trao đổi theo luồng](Hinh_anh/thread.png) |
+| ![Phân trang và quản trị người dùng (dữ liệu thử tải 100 người)](Hinh_anh/pagination.png) | |
 
 ## Tài liệu
 

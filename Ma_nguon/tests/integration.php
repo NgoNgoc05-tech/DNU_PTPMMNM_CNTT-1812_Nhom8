@@ -400,7 +400,7 @@ try {
     $markD = $notes24->latestId($D);
     same($notes24->remindDue(true) >= 1, true, 'v24-due-soon-reminder-sent');
     $dueNote = array_values(array_filter($notes24->since($D, $markD), fn ($n) => $n['kind'] === 'DUE_SOON'));
-    same([count($dueNote), str_starts_with($dueNote[0]['body'] ?? '', 'Hạn ngày mai'), $dueNote[0]['actor'] ?? ''], [1, true, '⏰ Nhắc hạn'], 'v24-due-soon-to-assignee');
+    same([count($dueNote), str_starts_with($dueNote[0]['body'] ?? '', 'Hạn ngày mai'), $dueNote[0]['actor'] ?? ''], [1, true, 'Nhắc hạn'], 'v24-due-soon-to-assignee');
     $markD = $notes24->latestId($D);
     $notes24->remindDue(true);
     same(array_filter($notes24->since($D, $markD), fn ($n) => $n['kind'] === 'DUE_SOON'), [], 'v24-reminded-only-once');
@@ -416,6 +416,41 @@ try {
     $projects24->setArchived($A, $D, true);
     same((new AnnotationRepository($c))->countAssigned($D) < $before, true, 'v24-my-tasks-exclude-archived');
     $projects24->setArchived($A, $D, false);
+
+    echo "-- Bản 2.5: lọc, sắp xếp, phân trang ở CSDL; dọn dữ liệu cũ\n";
+    $p25 = new ProjectRepository($c);
+    same([$p25->countForUser($D, []), $p25->viewCounts($D)['active'] >= 2], [count(array_filter($p25->listForUser($D), fn ($p) => $p['archived_at'] === null)), true], 'v25-count-matches-list');
+    $page1 = $p25->pageForUser($D, ['sort' => 'name'], 1, 0);
+    $page2 = $p25->pageForUser($D, ['sort' => 'name'], 1, 1);
+    same([count($page1), count($page2), $page1[0]['id'] !== $page2[0]['id']], [1, 1, true], 'v25-project-pages-dont-overlap');
+    same(array_column($p25->pageForUser($D, ['sort' => 'name'], 50, 0), 'id'),
+        array_column(ProjectRepository::filter($p25->listForUser($D), ['sort' => 'name'], $D), 'id'), 'v25-sql-sort-same-as-php');
+    same(array_map('intval', array_column($p25->pageForUser($D, ['q' => 'foodnow'], 10, 0), 'id')), [$A], 'v25-sql-search-case-insensitive');
+    same(count($p25->pageForUser($D, ['q' => '100%'], 10, 0)), 0, 'v25-sql-search-percent-literal');
+    same((int) (array_column($p25->pageForUser($D, ['state' => 'open', 'sort' => 'open'], 10, 0), 'id')[0] ?? 0), $A, 'v25-sql-filter-open-sort-most');
+    $first = $p25->pageForUser($D, [], 1, 0)[0];
+    same(isset($first['member_names'], $first['screens']) && (int) $first['screens'] > 0, true, 'v25-page-has-card-details');
+    $ann25 = new AnnotationRepository($c);
+    $all25 = $ann25->countSearch($A);
+    $pA = $ann25->search($A, '', 0, '', 0, ['limit' => 5, 'offset' => 0]);
+    $pB = $ann25->search($A, '', 0, '', 0, ['limit' => 5, 'offset' => 5]);
+    same([count($ann25->search($A)), count($pA), array_intersect(array_column($pA, 'id'), array_column($pB, 'id'))], [$all25, 5, []], 'v25-search-paged-no-overlap');
+    same($ann25->countSearch($A, 'OPEN', 0, '', 0, ['priority' => 'HIGH']), count($ann25->search($A, 'OPEN', 0, '', 0, ['priority' => 'HIGH'])), 'v25-count-search-matches');
+    same(count($ann25->activity($A, 3, 0, 0)) === 3 && $ann25->activity($A, 1, 0, 1)[0]['id'] === $ann25->activity($A, 3)[1]['id'], true, 'v25-activity-paged');
+    same($ann25->countAssigned($D), count($ann25->assignedTo($D, 500)), 'v25-assigned-count-matches');
+    $n25 = new NotificationRepository($c);
+    same($n25->countFor($D), count($n25->listFor($D, 1000)), 'v25-notification-count');
+    $adm25 = new AdminRepository($c);
+    same([$adm25->countUsers('+' . $suffix), count($adm25->users('+' . $suffix, '', 2, 0)), count($adm25->users('+' . $suffix, '', 2, 4))], [5, 2, 1], 'v25-admin-users-paged');
+    same((int) array_column($adm25->users('+' . $suffix, '', 10, 0, 'active'), 'id')[0], $R, 'v25-admin-sort-most-active');
+    same($adm25->countProjects($suffix) >= 0 && count($adm25->projects('', 1, 0, 'open')) === 1, true, 'v25-admin-projects-paged');
+    queryParams($c, "INSERT INTO notifications (user_id, actor_id, kind, annotation_id, body, read_at, created_at)
+                     VALUES ($1, $2, 'REPLY', $3, 'cũ', now() - interval '100 days', now() - interval '100 days')", [$D, $R, $repo->search($A)[0]['id']]);
+    $before = $n25->countFor($D);
+    $res = $n25->cleanup();
+    same([$res['notifications'] >= 1, $n25->countFor($D)], [true, $before - 1], 'v25-cleanup-old-read-notifications');
+    $indexes = array_column(fetchAll($c, "SELECT indexname FROM pg_indexes WHERE schemaname = 'public'"), 'indexname');
+    same(array_values(array_diff(['project_members_user', 'screens_project', 'comments_parent', 'notifications_user_id', 'annotations_open_due'], $indexes)), [], 'v25-indexes-exist');
 
     echo "-- Tìm kiếm và xuất danh sách\n";
     $open = $repo->search($A, 'OPEN');

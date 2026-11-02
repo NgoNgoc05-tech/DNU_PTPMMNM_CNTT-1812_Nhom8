@@ -11,10 +11,13 @@ $c = db();
 $user = Auth::requireUser($c);
 AdminRepository::require($c, $user['id']);
 $admin = new AdminRepository($c);
-$tab = in_array(field($_GET, 'tab'), ['overview', 'users', 'projects'], true) ? field($_GET, 'tab') : 'overview';
+$tab = in_array(field($_GET, 'tab'), ['overview', 'users', 'projects', 'log'], true) ? field($_GET, 'tab') : 'overview';
 $q = field($_GET, 'q');
 $filter = field($_GET, 'filter');
-$back = '/admin.php?tab=' . $tab . ($q !== '' ? '&q=' . rawurlencode($q) : '') . ($filter !== '' ? '&filter=' . rawurlencode($filter) : '');
+$sort = field($_GET, 'sort');
+// Giữ nguyên tìm kiếm, lọc, sắp xếp và trang hiện tại sau mỗi thao tác.
+$back = '/admin.php?' . http_build_query(array_filter(['tab' => $tab, 'q' => $q, 'filter' => $filter, 'sort' => $sort,
+    'page' => intField($_GET, 'page'), 'per' => intField($_GET, 'per')], fn ($v) => $v !== '' && $v !== 0));
 if (isPost()) {
     checkCsrf($_POST);
     $target = intField($_POST, 'target');
@@ -72,6 +75,7 @@ require __DIR__ . '/../templates/header.php';
 <a href="/admin.php?tab=overview"<?= $tab === 'overview' ? ' aria-current="page"' : '' ?>><?= icon('chart', 'sm') ?>Tổng quan</a>
 <a href="/admin.php?tab=users"<?= $tab === 'users' ? ' aria-current="page"' : '' ?>><?= icon('users', 'sm') ?>Người dùng <span class="n"><?= $stats['users']['total'] ?></span></a>
 <a href="/admin.php?tab=projects"<?= $tab === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder', 'sm') ?>Dự án <span class="n"><?= $stats['projects']['projects'] ?></span></a>
+<a href="/admin.php?tab=log"<?= $tab === 'log' ? ' aria-current="page"' : '' ?>><?= icon('history', 'sm') ?>Nhật ký</a>
 <a href="/support_admin.php"><?= icon('inbox', 'sm') ?>Yêu cầu hỗ trợ <span class="n"><?= $stats['tickets']['open'] ?></span></a>
 </nav>
 </div>
@@ -108,16 +112,16 @@ require __DIR__ . '/../templates/header.php';
 <div class="card">
 <h2><?= icon('flag') ?>Dự án nhiều góp ý chưa xử lý</h2>
 <ul class="link-list">
-<?php $all = $admin->projects(); usort($all, fn ($a, $b) => (int) $b['open'] <=> (int) $a['open']); ?>
-<?php foreach (array_slice($all, 0, 5) as $p): ?>
+<?php $all = $admin->projects('', 5, 0, 'open'); ?>
+<?php foreach ($all as $p): ?>
 <li><?= icon('folder', 'sm') ?><span><strong><?= e($p['name']) ?></strong> · <?= (int) $p['open'] ?>/<?= (int) $p['annotations'] ?> chưa xử lý · <?= e($p['owner']) ?></span></li>
 <?php endforeach; ?>
 <?php if ($all === []): ?><li class="hint">Chưa có dự án nào.</li><?php endif; ?>
 </ul>
 </div>
 <div class="card">
-<h2><?= icon('history') ?>Nhật ký quản trị</h2>
-<?php $log = $admin->recentLog(12); ?>
+<div class="section-title"><h2><?= icon('history') ?>Nhật ký quản trị</h2><a class="hint" href="/admin.php?tab=log">Xem tất cả</a></div>
+<?php $log = $admin->recentLog(8); ?>
 <?php if ($log === []): ?><p class="hint">Chưa có thao tác quản trị nào.</p><?php endif; ?>
 <ul class="feed admin-log">
 <?php foreach ($log as $l): ?>
@@ -129,7 +133,7 @@ require __DIR__ . '/../templates/header.php';
 </div>
 
 <?php elseif ($tab === 'users'): ?>
-<?php $rows = $admin->users($q, $filter); ?>
+<?php $pg = Paginator::fromRequest($admin->countUsers($q, $filter), $_GET, 20); $rows = $admin->users($q, $filter, $pg->perPage, $pg->offset(), $sort); ?>
 <?php if ($issued !== null): ?>
 <div class="card reset-box mb">
 <div class="flash warn" role="status"><?= icon('key') ?><span>Link đặt lại mật khẩu chỉ hiện <strong>một lần</strong>, hiệu lực <?= PasswordReset::TTL_MINUTES ?> phút. Copy và gửi cho người dùng qua kênh liên hệ an toàn.</span></div>
@@ -140,7 +144,10 @@ require __DIR__ . '/../templates/header.php';
 <input type="hidden" name="tab" value="users">
 <div class="grow"><label for="aq">Tìm theo tên hoặc email</label><input id="aq" name="q" type="search" value="<?= e($q) ?>" placeholder="vd: trang, @pinpoint.test"></div>
 <div><label for="af">Lọc</label><select id="af" name="filter" data-autosubmit>
-<?php foreach (['' => 'Tất cả', 'locked' => 'Bị khoá', 'admin' => 'Quản trị viên', 'support' => 'Bộ phận hỗ trợ'] as $k => $label): ?><option value="<?= $k ?>"<?= $filter === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+<?php foreach (['' => 'Tất cả', 'locked' => 'Bị khoá', 'admin' => 'Quản trị viên', 'support' => 'Bộ phận hỗ trợ', 'inactive' => 'Không đăng nhập 30 ngày'] as $k => $label): ?><option value="<?= $k ?>"<?= $filter === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+</select></div>
+<div><label for="as">Sắp xếp</label><select id="as" name="sort" data-autosubmit>
+<?php foreach (AdminRepository::USER_SORTS as $k => $label): ?><option value="<?= $k ?>"<?= ($sort ?: 'new') === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
 </select></div>
 <button class="btn" type="submit"><?= icon('search') ?>Tìm</button>
 </form>
@@ -180,12 +187,16 @@ require __DIR__ . '/../templates/header.php';
 </tbody>
 </table>
 </div>
+<?= $pg->render('/admin.php', ['tab' => 'users', 'q' => $q, 'filter' => $filter, 'sort' => $sort], 'người dùng') ?>
 
-<?php else: ?>
-<?php $rows = $admin->projects($q); ?>
+<?php elseif ($tab === 'projects'): ?>
+<?php $pg = Paginator::fromRequest($admin->countProjects($q), $_GET, 20); $rows = $admin->projects($q, $pg->perPage, $pg->offset(), $sort); ?>
 <form method="get" action="/admin.php" class="filter-bar">
 <input type="hidden" name="tab" value="projects">
 <div class="grow"><label for="pq">Tìm theo tên dự án hoặc người tạo</label><input id="pq" name="q" type="search" value="<?= e($q) ?>"></div>
+<div><label for="ps">Sắp xếp</label><select id="ps" name="sort" data-autosubmit>
+<?php foreach (AdminRepository::PROJECT_SORTS as $k => $label): ?><option value="<?= $k ?>"<?= ($sort ?: 'new') === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+</select></div>
 <button class="btn" type="submit"><?= icon('search') ?>Tìm</button>
 </form>
 <div class="table-wrap">
@@ -194,7 +205,7 @@ require __DIR__ . '/../templates/header.php';
 <tbody>
 <?php foreach ($rows as $p): ?>
 <tr data-project="<?= e($p['name']) ?>">
-<td><strong><?= e($p['name']) ?></strong><div class="hint">#<?= (int) $p['id'] ?> · tạo <?= e(date('d/m/Y', (int) strtotime($p['created_at']))) ?></div></td>
+<td><strong><?= e($p['name']) ?></strong><?= $p['archived_at'] !== null ? ' <span class="badge badge-muted">Lưu trữ</span>' : '' ?><div class="hint">#<?= (int) $p['id'] ?> · tạo <?= e(date('d/m/Y', (int) strtotime($p['created_at']))) ?></div></td>
 <td><?= e($p['owner']) ?><div class="hint"><?= e($p['owner_email']) ?></div></td>
 <td class="num"><?= (int) $p['members'] ?></td><td class="num"><?= (int) $p['screens'] ?></td>
 <td class="num"><?= (int) $p['annotations'] ?> <span class="hint">(<?= (int) $p['open'] ?>)</span></td>
@@ -219,5 +230,22 @@ require __DIR__ . '/../templates/header.php';
 </tbody>
 </table>
 </div>
+<?= $pg->render('/admin.php', ['tab' => 'projects', 'q' => $q, 'sort' => $sort], 'dự án') ?>
+
+<?php else: ?>
+<?php $pg = Paginator::fromRequest($admin->countLog(), $_GET, 20); $log = $admin->recentLog($pg->perPage, $pg->offset()); ?>
+<div class="table-wrap">
+<table class="data" id="admin-log">
+<thead><tr><th>Thời điểm</th><th>Quản trị viên</th><th>Thao tác</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
+<tbody>
+<?php foreach ($log as $l): ?>
+<tr><td class="nowrap"><?= e(dateVi($l['created_at'])) ?><div class="hint"><?= e(ago($l['created_at'])) ?></div></td><td><?= e($l['admin'] ?? '—') ?></td>
+<td><span class="badge badge-role"><?= e($l['action']) ?></span></td><td><?= e($l['target']) ?></td><td class="hint"><?= e($l['detail']) ?></td></tr>
+<?php endforeach; ?>
+<?php if ($log === []): ?><tr><td colspan="5" class="hint">Chưa có thao tác quản trị nào.</td></tr><?php endif; ?>
+</tbody>
+</table>
+</div>
+<?= $pg->render('/admin.php', ['tab' => 'log'], 'thao tác') ?>
 <?php endif; ?>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

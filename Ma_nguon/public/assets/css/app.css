@@ -196,7 +196,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .toast { display: flex; align-items: center; gap: 9px; background: #111827; color: #fff; padding: 10px 16px; border-radius: 12px;
   box-shadow: var(--shadow-lg); max-width: 90vw; font-size: .9rem; animation: toast-in .2s ease-out; }
 .toast.error { background: var(--danger); }
-.toast.ok::before { content: "✓"; color: #4ade80; font-weight: 800; }
+.toast.ok::before { content: ""; width: 16px; height: 16px; flex: none; background: #4ade80; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Nhãn, huy hiệu ---------- */
@@ -960,3 +960,99 @@ a.summary-pill:hover { text-decoration: none; border-color: var(--brand); }
 .mention-head { padding: 6px 10px 4px; font-size: .7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 .mention-who { display: grid; text-align: left; line-height: 1.2; }
 .mention-who small { color: var(--text-3); font-size: .72rem; }
+
+/* =====================================================================
+   Bản 2.5: màu sắc rõ ràng hơn — mục đang chọn luôn tô màu, thêm điểm nhấn màu, phân trang
+   ===================================================================== */
+:root { --accent-grad: linear-gradient(90deg, #4f46e5 0%, #7c3aed 45%, #f97316 100%); --brand-soft-2: #e0e3ff; }
+:root[data-theme=dark] { --brand-soft-2: #2a2d63; }
+body { background: radial-gradient(1200px 400px at 85% -120px, rgba(124, 58, 237, .07), transparent 70%),
+  radial-gradient(900px 360px at -10% -80px, rgba(79, 70, 229, .07), transparent 70%), var(--bg); background-attachment: fixed; }
+.site-header { box-shadow: 0 1px 0 var(--line); position: sticky; }
+.site-header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent-grad); opacity: .85; }
+
+/* Menu chính: mục đang mở có nền màu + vạch dưới */
+.main-nav a[aria-current] { background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--brand); }
+.main-nav a[aria-current] svg.icon { color: var(--brand); }
+.main-nav a:hover:not([aria-current]) { background: var(--brand-soft); color: var(--brand-ink); }
+
+/* Nhóm nút chọn (segmented): nút đang chọn tô màu thương hiệu */
+.segmented { background: var(--surface-2); }
+.segmented [aria-pressed=true], .segmented [aria-current] { background: var(--brand); color: #fff; box-shadow: 0 2px 6px -1px rgba(79, 70, 229, .45); }
+.segmented [aria-pressed=true] .n, .segmented [aria-current] .n { color: #fff; background: rgba(255, 255, 255, .22); border-radius: 999px; padding: 0 6px; }
+.segmented [aria-pressed=true] svg.icon, .segmented [aria-current] svg.icon { color: #fff; }
+.segmented button:hover:not([aria-pressed=true]), .segmented a:hover:not([aria-current]) { background: var(--brand-soft); color: var(--brand-ink); }
+.version-pills a[aria-current] { background: var(--brand); color: #fff; }
+
+/* Tab trong bảng bên phải (Góp ý / Hoạt động) */
+.panel-tabs button[aria-selected=true] { color: var(--brand); }
+.panel-tabs button[aria-selected=true]::after { height: 3px; }
+.panel-tabs button[aria-selected=true] .n { background: var(--brand); color: #fff; }
+.panel-tabs button:hover:not([aria-selected=true]) { color: var(--brand-ink); }
+
+/* Thanh công cụ nổi và nhóm công cụ */
+.dock button[aria-pressed=true] { box-shadow: 0 3px 10px -2px rgba(79, 70, 229, .55); }
+.dock button:hover:not([aria-pressed=true]) { background: var(--brand-soft); color: var(--brand-ink); }
+.tool-group button:hover:not([aria-pressed=true]) { background: var(--brand-soft); color: var(--brand-ink); }
+
+/* Thẻ thống kê: vạch màu theo loại số liệu */
+.stat { position: relative; overflow: hidden; }
+.stat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--brand); }
+.stat:has(.stat-icon.pin)::before { background: var(--pin); }
+.stat:has(.stat-icon.ok)::before { background: var(--ok); }
+.stat:has(.stat-icon.danger)::before { background: var(--danger); }
+.stat:has(.stat-icon.warn)::before { background: var(--warn); }
+.stat strong { color: var(--text); }
+.stat:has(.stat-icon.danger) strong { color: var(--danger); }
+.stat:has(.stat-icon.ok) strong { color: var(--ok); }
+.stat:has(.stat-icon.pin) strong { color: var(--pin-2); }
+
+/* Tiêu đề mục, bảng, bộ lọc */
+.section-title h2 svg.icon, .card > h2 svg.icon { color: var(--brand); }
+.section-title .count { background: var(--brand-soft); color: var(--brand-ink); border-radius: 999px; padding: 0 9px; font-size: .78rem; }
+table.data th { background: var(--brand-soft); color: var(--brand-ink); }
+table.data tbody tr:hover td { background: color-mix(in srgb, var(--brand-soft) 45%, transparent); }
+.filter-bar, .project-filter { border-left: 3px solid var(--brand); }
+.project-filter { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: var(--radius); padding: 10px 12px; }
+.btn-ghost:hover { border-color: var(--brand); color: var(--brand-ink); background: var(--brand-soft); }
+.project-card:hover { border-color: var(--brand); }
+.project-card .card-body h2 { color: var(--text); }
+.card-foot .meta svg.icon { color: var(--brand); }
+.feed-icon { background: var(--brand-soft); color: var(--brand); }
+
+/* Phân trang dùng chung */
+.pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin: 16px 0 6px;
+  padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.pager-info { color: var(--text-2); font-size: .86rem; }
+.pager-info strong { color: var(--text); }
+.pager-pages { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager-num, .pager-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 34px; height: 34px; padding: 0 10px;
+  border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--text-2); font-weight: 650; font-size: .86rem; }
+a.pager-num:hover, a.pager-btn:hover { border-color: var(--brand); color: var(--brand-ink); background: var(--brand-soft); text-decoration: none; }
+.pager-num.is-current { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 2px 6px -1px rgba(79, 70, 229, .45); }
+.pager-btn.is-disabled { opacity: .45; cursor: not-allowed; }
+.pager-gap { padding: 0 4px; color: var(--text-3); }
+.pager-size { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; }
+.pager-size a, .pager-size span.is-current { padding: 3px 8px; border-radius: 7px; color: var(--text-2); font-weight: 600; }
+.pager-size a:hover { background: var(--brand-soft); color: var(--brand-ink); text-decoration: none; }
+.pager-size span.is-current { background: var(--brand-soft); color: var(--brand-ink); }
+@media (max-width: 640px) { .pager { justify-content: center; } .pager-info { width: 100%; text-align: center; } }
+@media print { .pager { display: none; } }
+.project-filter .pf-search { flex: 1 1 220px; }
+.project-filter select { flex: 0 1 auto; max-width: 230px; }
+
+/* Bản 2.5: icon SVG thay cho emoji */
+.greet { display: flex; align-items: center; gap: 10px; }
+.greet-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--warn-soft); color: var(--warn); transform: rotate(-8deg); }
+.greet-icon svg.icon { width: 22px; height: 22px; }
+.empty-ok { display: flex; align-items: center; gap: 6px; color: var(--ok-ink); }
+.reaction svg.icon { width: 14px; height: 14px; }
+.reaction[data-reaction=LIKE] svg.icon, .react-picker .react-LIKE svg.icon { color: var(--brand); }
+.reaction[data-reaction=HEART] svg.icon, .react-picker .react-HEART svg.icon { color: #e11d48; fill: #e11d48; }
+.reaction[data-reaction=PARTY] svg.icon, .react-picker .react-PARTY svg.icon { color: var(--pin); }
+.reaction[data-reaction=EYES] svg.icon, .react-picker .react-EYES svg.icon { color: var(--info); }
+.react-picker .menu button svg.icon { width: 18px; height: 18px; }
+.react-picker .menu button:hover { background: var(--brand-soft); }
+.swipe-handle span svg.icon { width: 18px; height: 18px; color: #fff; }
+td.coord svg.icon { width: 13px; height: 13px; vertical-align: -2px; color: var(--pin); }
+.hint svg.icon.sm, p svg.icon.sm { vertical-align: -2px; }

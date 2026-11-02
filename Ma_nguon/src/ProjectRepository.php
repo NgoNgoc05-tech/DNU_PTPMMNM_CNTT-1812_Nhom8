@@ -49,6 +49,86 @@ final class ProjectRepository
     }
 
     /**
+     * Bản 2.5: tìm kiếm, lọc, sắp xếp và PHÂN TRANG dự án ngay trong CSDL (không tải hết về PHP).
+     * $f như filter(): q, view (active|archived), role (ADMIN|COMMENT|VIEW|OWNER), state (open|done|empty), sort.
+     * @return array{0:string,1:array} [câu SQL "base" đã lọc, tham số]
+     */
+    private function scoped(int $userId, array $f): array
+    {
+        $params = [$userId];
+        $where = [($f['view'] ?? 'active') === 'archived' ? 'b.archived_at IS NOT NULL' : 'b.archived_at IS NULL'];
+        $q = trim((string) ($f['q'] ?? ''));
+        if ($q !== '') {
+            $params[] = '%' . addcslashes(mb_substr($q, 0, 100), '%_\\') . '%';
+            $n = count($params);
+            $where[] = "(b.name ILIKE \$$n OR b.description ILIKE \$$n OR b.owner_name ILIKE \$$n)";
+        }
+        $role = (string) ($f['role'] ?? '');
+        if ($role === 'OWNER') {
+            $where[] = 'b.created_by = $1';
+        } elseif (in_array($role, Access::ROLES, true)) {
+            $params[] = $role;
+            $where[] = 'b.role = $' . count($params);
+        }
+        $where[] = match ((string) ($f['state'] ?? '')) {
+            'open' => 'b.open_items > 0',
+            'done' => 'b.total_items > 0 AND b.open_items = 0',
+            'empty' => 'b.total_items = 0',
+            default => 'TRUE',
+        };
+        // Số liệu mỗi dự án tính một lần bằng LATERAL (dùng chỉ mục screens_project, annotations_version_status).
+        $base = "SELECT p.id, p.name, p.description, p.created_at, p.created_by, p.archived_at, pm.role, ou.name AS owner_name,
+                        COALESCE(st.open_items, 0) AS open_items, COALESCE(st.total_items, 0) AS total_items, st.last_activity
+                   FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users ou ON ou.id = p.created_by
+                   LEFT JOIN LATERAL (
+                        SELECT COUNT(a.id) FILTER (WHERE a.status = 'OPEN') AS open_items, COUNT(a.id) AS total_items,
+                               MAX(a.updated_at) AS last_activity
+                          FROM screens s JOIN image_versions v ON v.screen_id = s.id JOIN annotations a ON a.image_version_id = v.id
+                         WHERE s.project_id = p.id) st ON true
+                  WHERE pm.user_id = \$1";
+        return ["SELECT * FROM ($base) b WHERE " . implode(' AND ', $where), $params];
+    }
+
+    public function countForUser(int $userId, array $f): int
+    {
+        [$sql, $params] = $this->scoped($userId, $f);
+        return (int) fetchOne($this->c, "SELECT COUNT(*) AS n FROM ($sql) x", $params)['n'];
+    }
+
+    /** Số dự án đang hoạt động / đã lưu trữ của một người (cho hai tab). */
+    public function viewCounts(int $userId): array
+    {
+        $r = fetchOne($this->c,
+            'SELECT COUNT(*) FILTER (WHERE p.archived_at IS NULL) AS active, COUNT(*) FILTER (WHERE p.archived_at IS NOT NULL) AS archived
+               FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE pm.user_id = $1', [$userId]);
+        return ['active' => (int) $r['active'], 'archived' => (int) $r['archived']];
+    }
+
+    /** Một trang dự án đã lọc + sắp xếp; thông tin hiển thị thẻ (ảnh bìa, thành viên) chỉ tính cho các dòng của trang. */
+    public function pageForUser(int $userId, array $f, int $limit, int $offset): array
+    {
+        [$sql, $params] = $this->scoped($userId, $f);
+        $order = match ((string) ($f['sort'] ?? 'activity')) {
+            'name' => 'lower(b.name), b.id',
+            'open' => 'b.open_items DESC, b.id',
+            'created' => 'b.id DESC',
+            default => 'COALESCE(b.last_activity, b.created_at) DESC, b.id DESC',
+        };
+        $params[] = $limit;
+        $params[] = $offset;
+        $n = count($params);
+        return fetchAll($this->c,
+            "SELECT b.*,
+                    (SELECT COUNT(*) FROM screens s WHERE s.project_id = b.id) AS screens,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.project_id = b.id) AS members,
+                    (SELECT string_agg(u.id || ':' || u.name, '|' ORDER BY m.created_at) FROM project_members m JOIN users u ON u.id = m.user_id
+                      WHERE m.project_id = b.id) AS member_names,
+                    (SELECT v.id FROM screens s JOIN image_versions v ON v.screen_id = s.id
+                      WHERE s.project_id = b.id ORDER BY s.id, v.version_no DESC LIMIT 1) AS cover_version_id
+               FROM ($sql) b ORDER BY $order LIMIT \$" . ($n - 1) . " OFFSET \$$n", $params);
+    }
+
+    /**
      * Bản 2.4: tìm kiếm, lọc, sắp xếp danh sách dự án (làm trên mảng đã lấy — mỗi người chỉ có vài chục dự án).
      * $f: q (tên/mô tả/người tạo), view (active|archived), role (ADMIN|COMMENT|VIEW|OWNER), state (open|done|empty),
      *     sort (activity|name|open|created).

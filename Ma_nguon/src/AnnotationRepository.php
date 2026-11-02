@@ -21,7 +21,7 @@ final class AnnotationRepository
         'UX' => 'Trải nghiệm', 'A11Y' => 'Trợ năng', 'OTHER' => 'Khác',
     ];
     public const STATUSES = ['OPEN' => 'Chưa xử lý', 'RESOLVED' => 'Đã xử lý'];
-    public const REACTIONS = ['LIKE' => '👍', 'HEART' => '❤️', 'PARTY' => '🎉', 'EYES' => '👀'];
+    public const REACTIONS = ['LIKE' => 'Thích', 'HEART' => 'Yêu thích', 'PARTY' => 'Chúc mừng', 'EYES' => 'Đang xem']; // giao diện vẽ bằng icon SVG
     public const NOTE_MAX = 4000;
 
     public function __construct(private PgSql\Connection $c)
@@ -320,7 +320,26 @@ final class AnnotationRepository
             'due' => 'a.due_date ASC NULLS LAST, a.id',
             default => 's.id, v.version_no, a.seq_no',
         };
+        // Bản 2.5: phân trang ở CSDL (trang Tìm góp ý); xuất CSV vẫn lấy toàn bộ danh sách đang lọc.
+        if (isset($more['limit'])) {
+            $order .= ', a.id LIMIT ' . max(1, (int) $more['limit']) . ' OFFSET ' . max(0, (int) ($more['offset'] ?? 0));
+        }
         return $this->query($where, $params, false, 0, $order);
+    }
+
+    /** Số góp ý khớp bộ lọc (cùng điều kiện với search()). */
+    public function countSearch(int $projectId, string $status = '', int $authorId = 0, string $q = '', int $screenId = 0, array $more = []): int
+    {
+        $where = 's.project_id = $1';
+        $params = [$projectId];
+        if ($screenId > 0) {
+            $params[] = $screenId;
+            $where .= ' AND s.id = $' . count($params);
+        }
+        [$where, $params] = $this->filters($where, $params, $status, $authorId, $q, $more);
+        return (int) fetchOne($this->c,
+            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+              WHERE $where", $params)['n'];
     }
 
     /** Thống kê cho bảng tổng quan dự án. */
@@ -357,7 +376,16 @@ final class AnnotationRepository
               WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL", [$userId])['n'];
     }
 
-    public function assignedTo(int $userId, int $limit = 20): array
+    /** Số góp ý quá hạn trong "Việc của tôi". */
+    public function countAssignedOverdue(int $userId): int
+    {
+        return (int) fetchOne($this->c,
+            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+               JOIN projects p ON p.id = s.project_id JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+              WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL AND a.due_date < CURRENT_DATE", [$userId])['n'];
+    }
+
+    public function assignedTo(int $userId, int $limit = 20, int $offset = 0): array
     {
         $rows = fetchAll($this->c,
             "SELECT a.id, a.seq_no, a.priority, a.due_date, a.image_version_id, v.version_no, s.id AS screen_id, s.name AS screen_name,
@@ -372,7 +400,7 @@ final class AnnotationRepository
               WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL
               ORDER BY a.due_date ASC NULLS LAST,
                        CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, a.id
-              LIMIT $2", [$userId, $limit]);
+              LIMIT $2 OFFSET $3", [$userId, $limit, $offset]);
         foreach ($rows as &$r) {
             $r['overdue'] = $r['overdue'] === 't';
         }
@@ -380,7 +408,14 @@ final class AnnotationRepository
     }
 
     /** Hoạt động gần đây của dự án (nhật ký), mới nhất trước. */
-    public function activity(int $projectId, int $limit = 30, int $screenId = 0): array
+    public function countActivity(int $projectId): int
+    {
+        return (int) fetchOne($this->c,
+            'SELECT COUNT(*) AS n FROM annotation_events e JOIN annotations a ON a.id = e.annotation_id
+               JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id WHERE s.project_id = $1', [$projectId])['n'];
+    }
+
+    public function activity(int $projectId, int $limit = 30, int $screenId = 0, int $offset = 0): array
     {
         $params = [$projectId, $limit];
         $extra = '';
@@ -397,7 +432,7 @@ final class AnnotationRepository
                JOIN image_versions v ON v.id = a.image_version_id
                JOIN screens s ON s.id = v.screen_id
               WHERE s.project_id = $1$extra
-              ORDER BY e.id DESC LIMIT $2", $params);
+              ORDER BY e.id DESC LIMIT $2 OFFSET " . max(0, $offset), $params);
     }
 
     // ------------------------------------------------------------------ nội bộ
@@ -583,7 +618,7 @@ final class AnnotationRepository
         return $items;
     }
 
-    /** @return array<int, list<array{kind:string,emoji:string,count:int,mine:bool,names:list<string>}>> */
+    /** @return array<int, list<array{kind:string,label:string,count:int,mine:bool,names:list<string>}>> */
     private function reactionsFor(array $commentIds, int $viewerId): array
     {
         if ($commentIds === []) {
@@ -597,7 +632,7 @@ final class AnnotationRepository
         foreach ($rows as $r) {
             $cid = (int) $r['comment_id'];
             $k = $r['kind'];
-            $out[$cid][$k] ??= ['kind' => $k, 'emoji' => self::REACTIONS[$k], 'count' => 0, 'mine' => false, 'names' => []];
+            $out[$cid][$k] ??= ['kind' => $k, 'label' => self::REACTIONS[$k], 'count' => 0, 'mine' => false, 'names' => []];
             $out[$cid][$k]['count']++;
             $out[$cid][$k]['names'][] = $r['name'];
             if ((int) $r['user_id'] === $viewerId) {

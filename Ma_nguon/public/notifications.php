@@ -14,7 +14,8 @@ if (isPost()) {
         ? field($_POST, 'go') : '/notifications.php');
 }
 $onlyUnread = field($_GET, 'filter') === 'unread';
-$items = $repo->listFor($user['id'], 100, $onlyUnread);
+$pg = Paginator::fromRequest($repo->countFor($user['id'], $onlyUnread), $_GET, 20);
+$items = $repo->listFor($user['id'], $pg->perPage, $onlyUnread, 0, $pg->offset());
 $unread = $repo->unreadCount($user['id']);
 $title = 'Thông báo';
 $active = 'notifications';
@@ -56,5 +57,6 @@ trong góp ý của mình hoặc góp ý của mình đổi trạng thái.</p></
 <?php endforeach; ?>
 </ul>
 </div>
+<?= $pg->render('/notifications.php', ['filter' => $onlyUnread ? 'unread' : ''], 'thông báo') ?>
 <?php endif; ?>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

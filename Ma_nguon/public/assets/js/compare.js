@@ -195,7 +195,7 @@
       overlayWrap.appendChild(box);
       stage.insertBefore(overlayWrap, views.right.layer); // trên ảnh mới, dưới các dấu của bản mới
       overlay = new Annotator(box, { imageUrl: cfg.left.imageUrl, width: cfg.left.width, height: cfg.left.height, editable: false, alt: '' });
-      handle = Pin.el('div', { class: 'swipe-handle' }, [Pin.el('span', { text: '⇆' })]);
+      handle = Pin.el('div', { class: 'swipe-handle' }, [Pin.el('span', {}, [Pin.icon('swap')])]);
       stage.appendChild(handle);
     }
     if (m === 'swipe' && range.value === '0') { range.value = '50'; }

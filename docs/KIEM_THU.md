@@ -4,11 +4,11 @@
 
 | Lệnh | Bộ kiểm thử | Cần | Số ca |
 |---|---|---|---|
-| `php tests/run.php` | Đơn vị: quyền, toạ độ, mũi tên/vẽ tay, escape, CSV, giới hạn ảnh, hiển thị dùng chung, trợ lý ảo | PHP | 73 |
+| `php tests/run.php` | Đơn vị: quyền, toạ độ, mũi tên/vẽ tay, escape, CSV, giới hạn ảnh, hiển thị dùng chung, trợ lý ảo | PHP | 81 |
 | `node --test tests/js/coords.test.mjs tests/js/drawing.test.mjs` | Hàm toạ độ JavaScript; so điểm ảnh “Tô chỗ khác”; rút gọn nét vẽ tay | Node ≥ 18 | 10 |
-| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (2.0) + thông báo, xoá, hồ sơ, hỗ trợ (2.1) + lời mời, bộ phận hỗ trợ (2.2) + mũi tên/vẽ tay, ảnh đính kèm, thông báo tức thời, quên mật khẩu, quản trị (2.3) trên PostgreSQL thật | PostgreSQL | 180 |
-| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0, lời mời, trang bộ phận hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | PostgreSQL | 67 |
-| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối, lịch hạn xử lý, lời mời, bộ phận hỗ trợ, mũi tên/vẽ tay, dán ảnh chụp, thông báo tức thời, tô chỗ khác, quên mật khẩu, quản trị | Máy chủ đang chạy + Playwright | 82 |
+| `php tests/integration.php` | Năm phép thử bắt buộc + thuộc tính, ghi chú, cảm xúc, nhật ký (2.0) + thông báo, xoá, hồ sơ, hỗ trợ (2.1) + lời mời, bộ phận hỗ trợ (2.2) + mũi tên/vẽ tay, ảnh đính kèm, thông báo tức thời, quên mật khẩu, quản trị (2.3) trên PostgreSQL thật | PostgreSQL | 197 |
+| `php tests/http.php` | Qua HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, XSS, tải tệp giả, API bản 2.0, lời mời, trang bộ phận hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | PostgreSQL | 74 |
+| `node tests/e2e/browser.mjs` | Trình duyệt thật: 2 tình huống, phép thử 1, xung đột, ô soạn nổi, ghi chú, cảm xúc, so sánh trượt/chồng mờ, giao diện tối, lịch hạn xử lý, lời mời, bộ phận hỗ trợ, mũi tên/vẽ tay, dán ảnh chụp, thông báo tức thời, tô chỗ khác, quên mật khẩu, quản trị | Máy chủ đang chạy + Playwright | 86 |
 
 `bash lab.sh test` chạy bốn bộ đầu và in `KET_QUA=TAT_CA_DAT` khi tất cả đều đạt. GitHub Actions (`.github/workflows/ci.yml`) chạy cả năm bộ
 trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Request.
@@ -22,6 +22,31 @@ trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Requ
 | 3. Phiên bản có nút chuyển vị trí | `t3-new-version-has-no-old-marks`, `t3-old-marks-stay-on-v1`, `t3-old-mark-keeps-old-coordinates`, `t3-all-versions-listed`, `t3-old-image-file-kept`, `t3-history-still-readable`; e2e `s2-old-marks-only-on-old-version` |
 | 4. Người chỉ xem; truy cập chéo dự án bằng URL | `t4-*`; `http-viewer-cannot-create/reply/change-status`, `http-viewer-cannot-read-image-B-by-url`, `http-viewer-cannot-read-comments-B-by-url`, `http-viewer-cannot-open-screen-B`, `http-viewer-cannot-export-B`; e2e `s1-viewer-*` |
 | 5. Hai người trả lời; sửa từ bản cũ; đóng rồi mở lại | `t5-two-concurrent-replies-kept` (hai kết nối, hai giao dịch xen kẽ), `t5-stale-edit-reports-conflict`, `t5-no-silent-overwrite`, `t5-edit-history-kept`, `t5-stale-status-reports-conflict`, `t5-close-reopen-history`; e2e `s1-stale-edit-shows-conflict`, `s2-reopen-history-3-entries` |
+
+## 2b. Thử tải (bản 2.5)
+
+Dữ liệu: 100 người dùng thử tải + dữ liệu mẫu, 33 dự án, 240 phiên bản ảnh, ~2 000 góp ý, ~6 000 nhận xét, ~3 700 thông báo
+(`php tools/seed_load.php`), đo bằng `php tools/bench.php`:
+
+```
+Dữ liệu: 105 người dùng · 33 dự án · 2046 góp ý · 6105 nhận xét · 3711 thông báo
+
+    2.6 ms  Trang Dự án: đếm + 1 trang (9 dự án), sắp theo hoạt động
+    1.4 ms  Trang Dự án: tìm "app" + lọc còn góp ý chờ
+    1.5 ms  Menu "Việc của tôi" (đếm)
+    2.4 ms  Trang Việc của tôi (20 dòng)
+    4.7 ms  Trình xem: góp ý + trao đổi của 1 phiên bản
+    4.0 ms  Tìm góp ý: đếm + trang 25 dòng, ưu tiên cao trước
+    8.9 ms  Tìm góp ý theo nội dung "nút"
+    0.9 ms  Thống kê dự án
+    3.0 ms  Chuông: số chưa đọc + 15 thông báo
+    2.0 ms  Chuông tự cập nhật (notif_poll)
+    1.7 ms  Quản trị: thống kê toàn hệ thống
+    1.8 ms  Quản trị: 20 người dùng, nhiều góp ý nhất
+    2.7 ms  Quản trị: 20 dự án, nhiều góp ý chờ nhất
+
+CHAM_NHAT=8.9 ms | DAT (< 50 ms)
+```
 
 ## 3. Lỗi phát hiện khi kiểm thử, cách sửa và kiểm tra lại
 
@@ -45,11 +70,11 @@ trên PHP 8.1 và 8.3 với PostgreSQL 16 mỗi lần push hoặc mở Pull Requ
 | 16 | Có thể lưu mũi tên không có toạ độ nét (`points` NULL) bằng SQL trực tiếp | `tests/integration.php` (`v23-db-constraint-arrow-needs-points`) | `jsonb_typeof(NULL)` cho NULL, ràng buộc CHECK coi NULL là đạt | Thêm `points IS NOT NULL` vào `annotations_geometry_check` | Reset rồi chạy lại: 160/160 |
 | 17 | Bấm “Cấp link đặt lại mật khẩu” xong không thấy link | e2e (bản 2.3) | Yêu cầu chuyển sang “Đã trả lời” nên biến mất khỏi bộ lọc “Đang chờ” đang mở | Sau khi cấp link chuyển sang mục “Tất cả” và cuộn tới đúng yêu cầu | e2e `v23-support-issues-reset-link` |
 
-## 4. Kết quả lần chạy cuối (bản 2.4, 02/11/2026)
+## 4. Kết quả lần chạy cuối (bản 2.5, 02/11/2026)
 
 Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từng bộ kiểm thử.
 
-### Đơn vị — `tests/run.php` (TESTS=73 FAILED=0)
+### Đơn vị — `tests/run.php` (TESTS=81 FAILED=0)
 
 **Phân quyền (ma trận VIEW / COMMENT / ADMIN)**: `view-can-view`, `view-cannot-comment`, `comment-can-comment`, `comment-cannot-manage`, `admin-can-comment`, `non-member-denied`, `unknown-role-denied`
 
@@ -67,13 +92,15 @@ Tất cả đều PASS. Danh sách dưới đây sinh từ đầu ra của từn
 
 **Bản 2.4: tìm kiếm, lọc, sắp xếp dự án (hàm thuần)**: `v24-active-sorted-by-activity`, `v24-archived-view`, `v24-search-name-case-insensitive`, `v24-filter-owner`, `v24-filter-all-resolved`, `v24-sort-most-open`, `v24-color-palette`
 
+**Bản 2.5: phân trang dùng chung**: `v25-pager-math`, `v25-pager-window-all-pages`, `v25-pager-window-middle`, `v25-pager-clamps-page`, `v25-pager-per-whitelist`, `v25-pager-render-escaped-keeps-filters`, `v25-pager-second-list-own-key`, `v25-no-emoji-in-ui-svg-icons-only`
+
 **Giới hạn ảnh tải lên (chỉ PNG/JPEG, ≤ 5 MB, 16–8000 px)**: `png-accepted`, `jpeg-accepted`, `gif-rejected`, `fake-png-rejected`, `over-5mb-rejected`, `tiny-rejected`, `stored-name-path-traversal`, `non-uploaded-path-rejected`
 
 ### JavaScript — `tests/js/coords.test.mjs`, `tests/js/drawing.test.mjs` (pass 10, fail 0)
 
 fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomAround giữ điểm dưới con trỏ, trường hợp phóng to 200%; bản 2.3: hai ảnh giống nhau không có vùng thay đổi, nút dời chỗ cho đúng hai vùng (chỗ cũ và chỗ mới), bỏ nhiễu lẻ tẻ và khác biệt dưới ngưỡng, rút gọn nét vẽ tay giữ hai đầu.
 
-### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=180 FAILED=0)
+### Tích hợp PostgreSQL — `tests/integration.php` (TESTS=197 FAILED=0)
 
 **Dữ liệu mẫu có đáp án**: `seed-20-annotations`, `seed-11-points`, `seed-9-rects`, `seed-13-open`, `seed-12-image-versions`, `seed-3-roles`
 
@@ -105,9 +132,11 @@ fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomArou
 
 **Bản 2.4: lưu trữ dự án, màu nét, trả lời theo luồng, nhắc hạn**: `v24-only-manager-archives`, `v24-archived-project-is-view-only`, `v24-archived-blocks-writes`, `v24-owner-can-still-delete-archived`, `v24-archived-listed-separately`, `v24-unarchive-restores-rights`, `v24-stroke-color-saved`, `v24-color-outside-palette-rejected`, `v24-point-has-no-color`, `v24-reply-to-stored`, `v24-replied-author-notified`, `v24-reply-to-other-annotation-rejected`, `v24-reply-to-root-allowed`, `v24-due-soon-reminder-sent`, `v24-due-soon-to-assignee`, `v24-reminded-only-once`, `v24-new-due-date-reminded-again`, `v24-far-due-date-not-reminded`, `v24-auto-scan-throttled`, `v24-my-tasks-exclude-archived`
 
+**Bản 2.5: lọc, sắp xếp, phân trang ở CSDL; dọn dữ liệu cũ**: `v25-count-matches-list`, `v25-project-pages-dont-overlap`, `v25-sql-sort-same-as-php`, `v25-sql-search-case-insensitive`, `v25-sql-search-percent-literal`, `v25-sql-filter-open-sort-most`, `v25-page-has-card-details`, `v25-search-paged-no-overlap`, `v25-count-search-matches`, `v25-activity-paged`, `v25-assigned-count-matches`, `v25-notification-count`, `v25-admin-users-paged`, `v25-admin-sort-most-active`, `v25-admin-projects-paged`, `v25-cleanup-old-read-notifications`, `v25-indexes-exist`
+
 **Tìm kiếm và xuất danh sách**: `search-open-only`, `search-by-text`, `search-percent-is-literal`, `filter-by-author`, `export-header`, `export-row-count`
 
-### HTTP — `tests/http.php` (TESTS=67 FAILED=0)
+### HTTP — `tests/http.php` (TESTS=74 FAILED=0)
 
 `http-anonymous-api-401`, `http-anonymous-image-denied`, `http-viewer-reads-image-A`, `http-viewer-cannot-read-image-B-by-url`, `http-viewer-cannot-read-comments-B-by-url`, `http-viewer-cannot-open-screen-B`, `http-viewer-cannot-export-B`, `http-viewer-cannot-create`, `http-viewer-cannot-reply`, `http-viewer-cannot-change-status`, `http-missing-csrf-rejected`, `http-comment-stored-literally`, `http-comment-rendered-as-text`, `http-csp-header`, `http-outside-image-422`, `http-export-csv`
 
@@ -121,9 +150,11 @@ fitContain, toScreen, toImage (kể cả lề trống), rectFromPoints, zoomArou
 
 **Bản 2.4: lưu trữ, lọc dự án, màu nét, trả lời theo luồng qua HTTP**: `http-commenter-cannot-archive`, `http-archived-moves-to-archive-tab`, `http-archived-project-read-only`, `http-archived-viewer-has-no-tools`, `http-project-search`, `http-create-colored-arrow`, `http-bad-color-422`, `http-reply-to-specific-comment`, `http-admin-forbidden-for-user`, `http-admin-lists-users`, `http-locked-user-session-ends`, `http-admin-action-needs-csrf`, `http-admin-projects-tab`, `http-fake-image-upload-rejected`
 
+**Bản 2.5: phân trang qua HTTP**: `http-issues-paged`, `http-bad-page-values-safe`, `http-projects-page-out-of-range-clamped`, `http-notifications-paged`, `http-admin-users-paged`, `http-admin-log-tab`, `http-support-desk-all-paged`, `http-fake-image-upload-rejected`
+
 **Tải tệp giả**: `http-fake-image-upload-rejected`
 
-### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=82 FAILED=0)
+### Trình duyệt — `tests/e2e/browser.mjs` (TESTS=86 FAILED=0)
 
-`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v21-delete-wrong-version`, `v22-due-date-mm-dd-yyyy`, `v22-due-date-shown-mm-dd-yyyy`, `v22-vietnamese-calendar`, `v22-no-native-english-picker`, `v22-calendar-pick-saves`, `v21-bell-shows-unread`, `v21-mention-notification-listed`, `v21-assistant-answers`, `v22-invite-pending-for-manager`, `v22-invitee-not-member-before-accept`, `v22-invitee-sees-invitation`, `v22-invitee-cannot-open-before-accept`, `v22-accept-opens-project`, `v22-accepted-becomes-member`, `v22-ticket-created`, `v22-support-notified`, `v22-support-desk-lists-ticket`, `v22-user-sees-reply`, `v22-user-notified-of-reply`, `v22-support-desk-forbidden-for-normal-user`, `v23-arrow-saved-in-original-pixels`, `v23-freehand-saved`, `v23-strokes-rendered`, `v23-click-stroke-opens-thread`, `v23-paste-screenshot-adds-attachment`, `v23-attachments-shown-in-reply`, `v23-live-notification-card`, `v23-bell-updates-without-reload`, `v23-diff-finds-changed-regions`, `v23-diff-covers-moved-button`, `v23-diff-region-zooms-in`, `v23-forgot-request-accepted`, `v23-support-issues-reset-link`, `v23-password-reset-via-link`, `v23-reset-link-single-use`, `v23-admin-overview`, `v23-admin-locks-user`, `v23-locked-user-logged-out`, `v23-locked-login-message`, `v23-admin-unlocks-user`, `v23-admin-sees-all-projects`, `v24-my-tasks-same-number`, `v24-assistant-button-round-icon`, `v24-live-project-search`, `v24-server-project-search`, `v24-confirm-dialog-centered`, `v24-confirm-cancel-keeps-member`, `v24-archived-project-read-only`, `v24-archived-tab-lists-project`, `v24-restore-project`, `v24-freehand-color`, `v24-reply-to-bar`, `v24-threaded-reply-quote`, `v24-quote-jumps-to-original`, `v24-mention-of-me-highlighted`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
+`t1-calibration-page-4-cases`, `t1-viewer-1440x900`, `t1-viewer-1100x650`, `t1-viewer-900x1000`, `t1-viewer-zoomed`, `s1-margin-click-ignored`, `v2-popover-composer-next-to-mark`, `s1-rect-saved-in-original-pixels`, `v2-create-with-priority-and-label`, `s1-comment-shown-as-text`, `v2-processing-note-saved`, `v2-reaction-on-comment`, `s1-reviewer-sees-designer-reply`, `s1-viewer-has-no-tools`, `s1-viewer-click-creates-nothing`, `s1-stale-edit-shows-conflict`, `s2-old-marks-only-on-old-version`, `s2-resolve-records-checked-version`, `s2-reopen-history-recorded`, `v2-compare-swipe-handle-at-50`, `v2-compare-swipe-overlays-old-version`, `v2-compare-onion-opacity`, `s2-export-has-content-position-status`, `v21-delete-wrong-version`, `v22-due-date-mm-dd-yyyy`, `v22-due-date-shown-mm-dd-yyyy`, `v22-vietnamese-calendar`, `v22-no-native-english-picker`, `v22-calendar-pick-saves`, `v21-bell-shows-unread`, `v21-mention-notification-listed`, `v21-assistant-answers`, `v22-invite-pending-for-manager`, `v22-invitee-not-member-before-accept`, `v22-invitee-sees-invitation`, `v22-invitee-cannot-open-before-accept`, `v22-accept-opens-project`, `v22-accepted-becomes-member`, `v22-ticket-created`, `v22-support-notified`, `v22-support-desk-lists-ticket`, `v22-user-sees-reply`, `v22-user-notified-of-reply`, `v22-support-desk-forbidden-for-normal-user`, `v23-arrow-saved-in-original-pixels`, `v23-freehand-saved`, `v23-strokes-rendered`, `v23-click-stroke-opens-thread`, `v23-paste-screenshot-adds-attachment`, `v23-attachments-shown-in-reply`, `v23-live-notification-card`, `v23-bell-updates-without-reload`, `v23-diff-finds-changed-regions`, `v23-diff-covers-moved-button`, `v23-diff-region-zooms-in`, `v23-forgot-request-accepted`, `v23-support-issues-reset-link`, `v23-password-reset-via-link`, `v23-reset-link-single-use`, `v23-admin-overview`, `v23-admin-locks-user`, `v23-locked-user-logged-out`, `v23-locked-login-message`, `v23-admin-unlocks-user`, `v23-admin-sees-all-projects`, `v25-issues-pager`, `v25-activity-paged`, `v24-my-tasks-same-number`, `v25-no-duplicate-summary`, `v25-selected-items-colored`, `v24-assistant-button-round-icon`, `v24-live-project-search`, `v24-server-project-search`, `v24-confirm-dialog-centered`, `v24-confirm-cancel-keeps-member`, `v24-archived-project-read-only`, `v24-archived-tab-lists-project`, `v24-restore-project`, `v24-freehand-color`, `v24-reply-to-bar`, `v24-threaded-reply-quote`, `v24-quote-jumps-to-original`, `v24-mention-of-me-highlighted`, `v2-filter-resolved-only`, `v2-dark-theme-toggle`, `no-javascript-errors`
 

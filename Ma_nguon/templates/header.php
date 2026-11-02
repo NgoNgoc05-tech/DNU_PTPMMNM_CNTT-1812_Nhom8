@@ -56,7 +56,7 @@ if (!empty($user)) {
 <a class="skip-link" href="#main">Đến nội dung chính</a>
 <header class="site-header">
 <div class="header-inner">
-<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.4</small></a>
+<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.5</small></a>
 <?php if (!empty($user)): ?>
 <nav class="main-nav" aria-label="Điều hướng chính">
 <a href="/projects.php"<?= $active === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder') ?>Dự án<?php if ($inviteCount > 0): ?> <span class="nav-count" title="Lời mời đang chờ"><?= $inviteCount ?></span><?php endif; ?></a>

@@ -55,7 +55,11 @@ final class AdminRepository
                FROM generate_series(CURRENT_DATE - ($1::int - 1), CURRENT_DATE, interval '1 day') AS d ORDER BY d", [$days]));
     }
 
-    public function users(string $q = '', string $filter = ''): array
+    public const USER_SORTS = ['new' => 'Mới đăng ký', 'name' => 'Tên A → Z', 'login' => 'Đăng nhập gần nhất', 'active' => 'Nhiều góp ý nhất'];
+    public const PROJECT_SORTS = ['new' => 'Mới tạo', 'open' => 'Nhiều góp ý chờ', 'size' => 'Dung lượng lớn', 'activity' => 'Hoạt động gần nhất'];
+
+    /** @return array{0:string,1:array} */
+    private function userWhere(string $q, string $filter): array
     {
         $params = [];
         $where = ['TRUE'];
@@ -67,36 +71,79 @@ final class AdminRepository
             'locked' => 'u.locked_at IS NOT NULL',
             'admin' => 'u.is_admin',
             'support' => 'u.is_support',
+            'inactive' => "(u.last_login_at IS NULL OR u.last_login_at < now() - interval '30 days')",
             default => 'TRUE',
         };
+        return [implode(' AND ', $where), $params];
+    }
+
+    public function countUsers(string $q = '', string $filter = ''): int
+    {
+        [$where, $params] = $this->userWhere($q, $filter);
+        return (int) fetchOne($this->c, "SELECT COUNT(*) AS n FROM users u WHERE $where", $params)['n'];
+    }
+
+    /** Một trang người dùng; số dự án / góp ý / nhận xét chỉ đếm cho các dòng của trang (dùng chỉ mục theo user). */
+    public function users(string $q = '', string $filter = '', int $limit = 20, int $offset = 0, string $sort = 'new'): array
+    {
+        [$where, $params] = $this->userWhere($q, $filter);
+        $order = match ($sort) {
+            'name' => 'lower(u.name), u.id',
+            'login' => 'u.last_login_at DESC NULLS LAST, u.id',
+            'active' => '(SELECT COUNT(*) FROM annotations a WHERE a.created_by = u.id) DESC, u.id',
+            default => 'u.id DESC',
+        };
+        $params[] = $limit;
+        $params[] = $offset;
+        $n = count($params);
         return fetchAll($this->c,
-            'SELECT u.id, u.email, u.name, u.title, u.created_at, u.last_login_at, u.is_admin, u.is_support, u.locked_at, u.locked_reason,
+            "SELECT u.id, u.email, u.name, u.title, u.created_at, u.last_login_at, u.is_admin, u.is_support, u.locked_at, u.locked_reason,
                     (SELECT COUNT(*) FROM project_members pm WHERE pm.user_id = u.id) AS projects,
                     (SELECT COUNT(*) FROM annotations a WHERE a.created_by = u.id) AS annotations,
                     (SELECT COUNT(*) FROM comments c WHERE c.author_id = u.id) AS comments
-               FROM users u WHERE ' . implode(' AND ', $where) . ' ORDER BY u.id LIMIT 500', $params);
+               FROM users u WHERE $where ORDER BY $order LIMIT \$" . ($n - 1) . " OFFSET \$$n", $params);
     }
 
-    public function projects(string $q = ''): array
+    public function countProjects(string $q = ''): int
     {
-        $params = [];
-        $where = 'TRUE';
-        if (trim($q) !== '') {
-            $params[] = '%' . addcslashes(mb_substr(trim($q), 0, 100), '%_\\') . '%';
-            $where = '(p.name ILIKE $1 OR o.email ILIKE $1 OR o.name ILIKE $1)';
+        [$where, $params] = $this->projectWhere($q);
+        return (int) fetchOne($this->c, "SELECT COUNT(*) AS n FROM projects p JOIN users o ON o.id = p.created_by WHERE $where", $params)['n'];
+    }
+
+    /** @return array{0:string,1:array} */
+    private function projectWhere(string $q): array
+    {
+        if (trim($q) === '') {
+            return ['TRUE', []];
         }
+        return ['(p.name ILIKE $1 OR o.email ILIKE $1 OR o.name ILIKE $1)', ['%' . addcslashes(mb_substr(trim($q), 0, 100), '%_\\') . '%']];
+    }
+
+    /** Một trang dự án toàn hệ thống; số liệu gom một lần cho mỗi dự án bằng LATERAL. */
+    public function projects(string $q = '', int $limit = 20, int $offset = 0, string $sort = 'new'): array
+    {
+        [$where, $params] = $this->projectWhere($q);
+        $order = match ($sort) {
+            'open' => 'st.open DESC, p.id DESC',
+            'size' => 'sz.bytes DESC, p.id DESC',
+            'activity' => 'st.last_activity DESC NULLS LAST, p.id DESC',
+            default => 'p.id DESC',
+        };
+        $params[] = $limit;
+        $params[] = $offset;
+        $n = count($params);
         return fetchAll($this->c,
-            "SELECT p.id, p.name, p.created_at, o.name AS owner, o.email AS owner_email,
+            "SELECT p.id, p.name, p.created_at, p.archived_at, o.name AS owner, o.email AS owner_email,
                     (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id) AS members,
                     (SELECT COUNT(*) FROM screens s WHERE s.project_id = p.id) AS screens,
-                    (SELECT COUNT(*) FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
-                      WHERE s.project_id = p.id) AS annotations,
-                    (SELECT COUNT(*) FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
-                      WHERE s.project_id = p.id AND a.status = 'OPEN') AS open,
-                    (SELECT COALESCE(SUM(v.byte_size), 0) FROM image_versions v JOIN screens s ON s.id = v.screen_id WHERE s.project_id = p.id) AS bytes,
-                    (SELECT MAX(a.updated_at) FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
-                      WHERE s.project_id = p.id) AS last_activity
-               FROM projects p JOIN users o ON o.id = p.created_by WHERE $where ORDER BY p.id DESC LIMIT 500", $params);
+                    st.annotations, st.open, st.last_activity, sz.bytes
+               FROM projects p JOIN users o ON o.id = p.created_by
+               LEFT JOIN LATERAL (SELECT COUNT(a.id) AS annotations, COUNT(a.id) FILTER (WHERE a.status = 'OPEN') AS open, MAX(a.updated_at) AS last_activity
+                                    FROM screens s JOIN image_versions v ON v.screen_id = s.id JOIN annotations a ON a.image_version_id = v.id
+                                   WHERE s.project_id = p.id) st ON true
+               LEFT JOIN LATERAL (SELECT COALESCE(SUM(v.byte_size), 0) AS bytes FROM screens s JOIN image_versions v ON v.screen_id = s.id
+                                   WHERE s.project_id = p.id) sz ON true
+              WHERE $where ORDER BY $order LIMIT \$" . ($n - 1) . " OFFSET \$$n", $params);
     }
 
     public function setLocked(int $adminId, int $userId, bool $locked, string $reason = ''): void
@@ -163,11 +210,16 @@ final class AdminRepository
             [$adminId, $action, mb_substr($target, 0, 200), mb_substr($detail, 0, 300)]);
     }
 
-    public function recentLog(int $limit = 30): array
+    public function recentLog(int $limit = 30, int $offset = 0): array
     {
         return fetchAll($this->c,
             'SELECT l.action, l.target, l.detail, l.created_at, u.name AS admin FROM admin_log l LEFT JOIN users u ON u.id = l.admin_id
-              ORDER BY l.id DESC LIMIT $1', [$limit]);
+              ORDER BY l.id DESC LIMIT $1 OFFSET $2', [$limit, $offset]);
+    }
+
+    public function countLog(): int
+    {
+        return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM admin_log')['n'];
     }
 
     private function user(int $userId): array

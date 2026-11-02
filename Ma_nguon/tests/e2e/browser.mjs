@@ -426,12 +426,28 @@ try {
   check((await adm.$$('#admin-projects tbody tr')).length >= 2, 'v23-admin-sees-all-projects');
   await anonCtx.close();
 
+  // ================= Bản 2.5: phân trang =================
+  await designer.goto(`${BASE}/issues.php?project=${item.project_id}&per=25`);
+  const pagerText = await designer.textContent('.pager .pager-info');
+  const shown = (await designer.$$('#issues tbody tr')).length;
+  check(/Hiển thị 1–\d+ trên \d+ góp ý/.test(pagerText) && shown <= 25, 'v25-issues-pager', pagerText);
+  await designer.goto(`${BASE}/issues.php?project=${item.project_id}&per=25&apage=2#activity`);
+  check((await designer.$$('#activity .feed li')).length <= 15 && await designer.$('#activity .pager-num.is-current') !== null, 'v25-activity-paged');
+  await designer.screenshot({ path: path.join(OUT, 'v25-issues.png') });
+
   // ================= Bản 2.4 =================
   // Tên "Việc của tôi" thống nhất: số trên menu = số ở trang Dự án; nút trợ lý là icon tròn
   await designer.goto(`${BASE}/projects.php`);
   const navCount = (await designer.textContent('.main-nav a[href="/inbox.php"] .nav-count')).trim();
-  const pillCount = (await designer.textContent('.summary-pill.mine strong')).trim();
-  check(navCount === pillCount && (await designer.textContent('.summary-pill.mine')).includes('việc của tôi'), 'v24-my-tasks-same-number', `${navCount} vs ${pillCount}`);
+  const pillCount = (await designer.textContent('aside .section-title:has-text("Việc của tôi") .count')).trim();
+  check(navCount === pillCount, 'v24-my-tasks-same-number', `${navCount} vs ${pillCount}`);
+  // Bản 2.5: bỏ hai ô tóm tắt trùng lặp dưới lời chào; mục đang chọn có màu
+  check(await designer.$('.summary-pill.mine') === null, 'v25-no-duplicate-summary');
+  const colors = await designer.evaluate(() => {
+    const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
+    return { nav: bg('.main-nav a[aria-current]'), seg: bg('.segmented [aria-current]'), segColor: getComputedStyle(document.querySelector('.segmented [aria-current]')).color };
+  });
+  check(colors.seg === 'rgb(79, 70, 229)' && colors.segColor === 'rgb(255, 255, 255)' && colors.nav !== 'rgba(0, 0, 0, 0)', 'v25-selected-items-colored', JSON.stringify(colors));
   const fab = await designer.$eval('#chat-open', (b) => { const r = b.getBoundingClientRect(); return { w: r.width, h: r.height, text: b.textContent.trim() }; });
   check(Math.abs(fab.w - fab.h) < 2 && fab.w <= 50 && fab.text === '', 'v24-assistant-button-round-icon', JSON.stringify(fab));
   // Tìm dự án ngay khi gõ, rồi tìm ở máy chủ

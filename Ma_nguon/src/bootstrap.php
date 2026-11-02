@@ -22,6 +22,7 @@ require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/PasswordReset.php';
 require_once __DIR__ . '/AdminRepository.php';
 require_once __DIR__ . '/Export.php';
+require_once __DIR__ . '/Paginator.php';
 require_once __DIR__ . '/Seeder.php';
 
 /** Thông báo tiếng Việt cho các mã lỗi nghiệp vụ. */

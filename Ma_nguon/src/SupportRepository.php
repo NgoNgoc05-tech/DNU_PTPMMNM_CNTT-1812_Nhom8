@@ -43,7 +43,7 @@ final class SupportRepository
     }
 
     /** Danh sách cho bộ phận hỗ trợ, lọc theo trạng thái ('' = tất cả). */
-    public function listAll(string $status = ''): array
+    public function listAll(string $status = '', int $limit = 200, int $offset = 0): array
     {
         $params = [];
         $where = '';
@@ -54,7 +54,8 @@ final class SupportRepository
         return fetchAll($this->c,
             "SELECT t.*, u.name AS user_name, u.email AS user_email, h.name AS handled_by_name
                FROM support_tickets t JOIN users u ON u.id = t.user_id LEFT JOIN users h ON h.id = t.handled_by
-               $where ORDER BY CASE t.status WHEN 'OPEN' THEN 0 WHEN 'ANSWERED' THEN 1 ELSE 2 END, t.id DESC LIMIT 200", $params);
+               $where ORDER BY CASE t.status WHEN 'OPEN' THEN 0 WHEN 'ANSWERED' THEN 1 ELSE 2 END, t.id DESC
+              LIMIT " . max(1, $limit) . ' OFFSET ' . max(0, $offset), $params);
     }
 
     public function counts(): array

@@ -72,6 +72,12 @@ function icon(string $name, string $class = ''): string
         'archive' => '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>',
         'palette' => '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-.9-.8-1.3-.8-2.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
         'reply' => '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
+        'thumb-up' => '<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M7 10l4-7a2.5 2.5 0 0 1 3 3l-1 4h5.5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 21H7"/>',
+        'heart' => '<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/>',
+        'party' => '<path d="M4 20 9 7l8 8z"/><path d="M14 4v2M19 9h2M17.5 6.5 19 5M12.5 9.5c1.5-1.5 3.5-1.5 5 0"/>',
+        'wave' => '<path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M10 10.5V5a1.5 1.5 0 0 1 3 0v5.5"/><path d="M13 10.5V6.5a1.5 1.5 0 0 1 3 0V13"/><path d="M16 11a1.5 1.5 0 0 1 3 0v3a7 7 0 0 1-7 7h-.5A6.5 6.5 0 0 1 5 16.2L3.4 13a1.5 1.5 0 0 1 2.6-1.5L7 13"/>',
+        'swap' => '<path d="m8 7-4 5 4 5M16 7l4 5-4 5M4 12h16"/>',
+        'dot' => '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
         'sparkle' => '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
     ];
     return '<svg class="icon' . ($class !== '' ? ' ' . $class : '') . '" viewBox="0 0 24 24" aria-hidden="true">' . ($paths[$name] ?? '') . '</svg>';

@@ -115,6 +115,7 @@ final class NotificationRepository
                 return 0;
             }
         }
+        $this->cleanup();
         $rows = fetchAll($this->c,
             "SELECT a.id, a.due_date, a.seq_no, COALESCE(a.assignee_id, a.created_by) AS uid, u.email, u.name, u.email_reminders,
                     s.name AS screen_name, v.version_no, p.name AS project_name, rc.body,
@@ -142,6 +143,21 @@ final class NotificationRepository
         return count($rows);
     }
 
+    /**
+     * Bản 2.5: dọn dữ liệu cũ để bảng không phình mãi (chạy cùng lượt quét nhắc hạn, tối đa 10 phút một lần):
+     * thông báo đã đọc quá 90 ngày, thông báo chưa đọc quá 180 ngày, mã đặt lại mật khẩu đã dùng/hết hạn quá 1 ngày.
+     * @return array{notifications:int,resets:int}
+     */
+    public function cleanup(): array
+    {
+        $n = pg_affected_rows(queryParams($this->c,
+            "DELETE FROM notifications WHERE (read_at IS NOT NULL AND read_at < now() - interval '90 days')
+                                          OR created_at < now() - interval '180 days'", []));
+        $r = pg_affected_rows(queryParams($this->c,
+            "DELETE FROM password_resets WHERE expires_at < now() - interval '1 day' OR used_at < now() - interval '1 day'", []));
+        return ['notifications' => $n, 'resets' => $r];
+    }
+
     public function unreadCount(int $userId): int
     {
         return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [$userId])['n'];
@@ -158,7 +174,12 @@ final class NotificationRepository
         return array_values(array_filter($this->listFor($userId, $limit, false, $afterId), fn ($n) => !$n['read']));
     }
 
-    public function listFor(int $userId, int $limit = 20, bool $unreadOnly = false, int $afterId = 0): array
+    public function countFor(int $userId, bool $unreadOnly = false): int
+    {
+        return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1' . ($unreadOnly ? ' AND read_at IS NULL' : ''), [$userId])['n'];
+    }
+
+    public function listFor(int $userId, int $limit = 20, bool $unreadOnly = false, int $afterId = 0, int $offset = 0): array
     {
         $rows = fetchAll($this->c,
             'SELECT n.id, n.kind, n.body, n.created_at, n.read_at, n.annotation_id, u.id AS actor_id, u.name AS actor,
@@ -173,12 +194,12 @@ final class NotificationRepository
                LEFT JOIN screens s ON s.id = v.screen_id
                LEFT JOIN projects p ON p.id = s.project_id
               WHERE n.user_id = $1 AND n.id > $3' . ($unreadOnly ? ' AND n.read_at IS NULL' : '') . '
-              ORDER BY n.id DESC LIMIT $2', [$userId, $limit, $afterId]);
+              ORDER BY n.id DESC LIMIT $2 OFFSET $4', [$userId, $limit, $afterId, $offset]);
         return array_map(fn ($r) => [
             'id' => (int) $r['id'], 'kind' => $r['kind'], 'annotation_id' => $r['annotation_id'] === null ? null : (int) $r['annotation_id'],
             'version_id' => $r['version_id'] === null ? null : (int) $r['version_id'], 'label' => self::KINDS[$r['kind']], 'body' => $r['body'],
             'created_at' => $r['created_at'], 'read' => $r['read_at'] !== null,
-            'actor' => $r['actor'] ?? match ($r['kind']) { 'TICKET_REPLY' => 'Bộ phận hỗ trợ', 'DUE_SOON' => '⏰ Nhắc hạn', default => null }, 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
+            'actor' => $r['actor'] ?? match ($r['kind']) { 'TICKET_REPLY' => 'Bộ phận hỗ trợ', 'DUE_SOON' => 'Nhắc hạn', default => null }, 'actor_id' => $r['actor_id'] === null ? 0 : (int) $r['actor_id'],
             'link' => match (true) {
                 $r['kind'] === 'INVITE' => '/projects.php#invites',
                 $r['kind'] === 'TICKET' => '/support_admin.php#t' . (int) $r['ticket_id'],

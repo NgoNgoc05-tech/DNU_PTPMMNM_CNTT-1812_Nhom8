@@ -124,6 +124,21 @@ flowchart LR
   Mọi POST đều kiểm tra CSRF. Ảnh lưu ngoài `public/` với tên ngẫu nhiên, kiểm tra loại bằng nội dung tệp, giới hạn 5 MB và 16–8000 px.
   Ô CSV bắt đầu bằng `= + - @` được thêm dấu nháy để Excel không hiểu là công thức. Mật khẩu được băm và phiên được tạo lại khi đăng nhập.
 
+## 5b. Quản lý dữ liệu ở quy mô ~100 người dùng (bản 2.5)
+
+- **Lọc, sắp xếp, đếm, phân trang trong CSDL**: mọi danh sách dài (`ProjectRepository::pageForUser`, `AnnotationRepository::search` + `countSearch`,
+  `assignedTo`, `NotificationRepository::listFor` + `countFor`, `SupportRepository::listAll`, `AdminRepository::users/projects` + `count…`)
+  đếm tổng trước rồi chỉ lấy một trang bằng `LIMIT/OFFSET`. Số liệu theo dự án gom một lần bằng `LEFT JOIN LATERAL` thay cho nhiều truy vấn con lặp lại;
+  thông tin chỉ cần để hiển thị (ảnh bìa, danh sách thành viên) chỉ tính cho các dòng của trang.
+- **Chỉ mục** cho mọi khoá ngoại và truy vấn hay dùng: `project_members(user_id)`, `screens(project_id)`, `annotations(created_by)`,
+  `annotations(due_date) WHERE status = 'OPEN'`, `comments(parent_id)`, `comments(author_id)`, `comment_reactions(comment_id)`,
+  `notifications(user_id, id DESC)`, `support_tickets(user_id)`, `support_tickets(status)`, `project_invitations(user_id) WHERE PENDING`…
+- **Thành phần phân trang dùng chung** `src/Paginator.php`: kẹp số trang hợp lệ, chỉ nhận số dòng trong danh sách cho phép (chống `?per=100000`),
+  giữ bộ lọc khi chuyển trang, danh sách phụ trên cùng trang dùng khoá riêng (`?apage=` cho nhật ký hoạt động).
+- **Vòng đời dữ liệu**: `NotificationRepository::cleanup()` xoá thông báo đã đọc quá 90 ngày / quá 180 ngày và mã đặt lại mật khẩu cũ;
+  chạy cùng lượt quét nhắc hạn (khoá bằng `app_state`, tối đa 10 phút một lần) nên không cần cron.
+- **Đo kiểm**: `tools/seed_load.php` sinh dữ liệu cố định (mt_srand) ở quy mô thật, `tools/bench.php` đo 13 truy vấn chính (mỗi truy vấn 5 lần).
+
 ## 6. Trang và API
 
 | URL | Quyền tối thiểu | Mục đích |

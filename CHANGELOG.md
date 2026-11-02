@@ -9,16 +9,40 @@
 - Phân trang trang Tìm góp ý khi dự án có hàng nghìn góp ý.
 - Thông báo thời gian thực khi có trả lời mới.
 
+## [2.5.0] - 2026-11-02
+
+### Thêm
+- **Phân trang rõ ràng** ở mọi danh sách dài: Dự án (9/18/36), Tìm góp ý (25/50/100), Nhật ký hoạt động dự án (15), Việc của tôi,
+  Thông báo, Xử lý yêu cầu hỗ trợ, Quản trị (Người dùng, Dự án, Nhật ký). Thanh phân trang có “Hiển thị 21–40 trên 135 …”,
+  nút Trước/Sau, số trang (1 … 4 [5] 6 … 20) và chọn số dòng mỗi trang; giữ nguyên bộ lọc khi chuyển trang.
+- Quản trị: sắp xếp người dùng (mới đăng ký, tên, đăng nhập gần nhất, nhiều góp ý nhất), lọc “Không đăng nhập 30 ngày”;
+  sắp xếp dự án (mới tạo, nhiều góp ý chờ, dung lượng, hoạt động); tab **Nhật ký** quản trị đầy đủ.
+- `php tools/seed_load.php` nạp dữ liệu thử tải quy mô thật (100 người dùng, 30 dự án, 240 phiên bản ảnh, ~2 000 góp ý, ~6 000 nhận xét)
+  và `php tools/bench.php` đo thời gian các truy vấn chính; `--clean` xoá sạch dữ liệu thử tải.
+
+### Thay đổi
+- **Quản lý dữ liệu cho ~100 người dùng**: lọc, sắp xếp, đếm và phân trang chạy **trong PostgreSQL** (`LIMIT/OFFSET`, `LATERAL`)
+  thay vì tải hết về PHP; thêm 15 chỉ mục cho các khoá ngoại và truy vấn hay dùng (thành viên theo người dùng, màn hình theo dự án,
+  trả lời, thông báo, yêu cầu hỗ trợ, góp ý quá hạn…). Kết quả đo với dữ liệu thử tải: trang chậm nhất **< 10 ms** (xem docs/KIEM_THU.md).
+- **Tự dọn dữ liệu cũ** (cùng lượt quét nhắc hạn, tối đa 10 phút một lần): thông báo đã đọc quá 90 ngày, thông báo quá 180 ngày,
+  mã đặt lại mật khẩu đã dùng/hết hạn quá 1 ngày.
+- **Màu sắc**: mục đang chọn ở nhóm nút (Đang hoạt động/Đã lưu trữ, chế độ so sánh, bộ lọc trạng thái…), menu chính, tab và thanh công cụ
+  đều tô màu thương hiệu; thẻ thống kê có vạch màu theo loại số liệu; tiêu đề bảng, biểu tượng mục, đường viền bộ lọc có màu nhấn; thanh màu dưới đầu trang.
+- **Bỏ emoji, dùng icon SVG** trong toàn bộ giao diện: lời chào (bàn tay vẫy), cảm xúc (Thích, Yêu thích, Chúc mừng, Đang xem),
+  tay kéo thanh trượt so sánh, dấu tích của thông báo nhỏ, cột vị trí ở Tìm góp ý (điểm/vùng/mũi tên/vẽ tay), chuông, nhắc hạn, trợ lý ảo.
+  Icon SVG hiển thị giống nhau trên Windows, macOS, Android và đổi màu theo giao diện sáng/tối; có ca kiểm thử chặn emoji quay lại.
+- Trang Dự án bỏ hai ô tóm tắt “việc của tôi / góp ý chưa xử lý” dưới lời chào (đã có trên menu và khung Việc của tôi).
+
 ## [2.4.0] - 2026-11-02
 
 ### Thêm
 - **Tìm kiếm, lọc, sắp xếp dự án** ở trang Dự án: tìm theo tên / mô tả / người tạo (lọc ngay khi gõ, Enter để tìm ở máy chủ),
   lọc theo quyền (Tôi tạo, Quản lý, Góp ý, Chỉ xem) và tiến độ (còn góp ý chờ, đã xử lý hết, chưa có góp ý),
   sắp xếp theo hoạt động gần nhất, nhiều góp ý chờ nhất, tên A→Z, mới tạo.
-- **Lưu trữ dự án** (nút ⚙ trong trang dự án): dự án chuyển sang mục **Đã lưu trữ**, chỉ xem — máy chủ chặn mọi thao tác ghi
+- **Lưu trữ dự án** (nút Cài đặt (bánh răng) trong trang dự án): dự án chuyển sang mục **Đã lưu trữ**, chỉ xem — máy chủ chặn mọi thao tác ghi
   (`PROJECT_ARCHIVED`); Quản lý bấm **Khôi phục** để làm tiếp. Dự án lưu trữ không tính vào “Việc của tôi” và không nhắc hạn.
 - **Chọn màu nét** (bảng 7 màu trên thanh công cụ) cho vùng, mũi tên và vẽ tay; màu được nhớ trên trình duyệt; đầu mũi tên cùng màu.
-- **Nhắc hạn trước 24 giờ**: góp ý chưa xử lý có hạn hôm nay / ngày mai được nhắc một lần trong chuông (“⏰ Nhắc hạn”) cho người phụ trách
+- **Nhắc hạn trước 24 giờ**: góp ý chưa xử lý có hạn hôm nay / ngày mai được nhắc một lần trong chuông (“Nhắc hạn”) cho người phụ trách
   (chưa giao ai thì người tạo); đổi hạn thì nhắc lại. Email nhắc thêm nếu máy chủ có `PINPOINT_MAIL_FROM`, tắt/bật ở **Hồ sơ → Nhắc hạn xử lý**.
   Không cần cron (tự quét tối đa 10 phút một lần khi có người dùng); có `php tools/reminders.php` cho cron.
 - **Trao đổi theo luồng**: nút **Trả lời** trên từng tin, ô soạn hiện “Trả lời …” và tự thêm @tên; trả lời hiện trích dẫn ngắn của tin được đáp,
@@ -37,7 +61,7 @@
 - **Công cụ vẽ**: **Mũi tên** (phím `A`, kéo từ đuôi tới đầu) và **Vẽ tay** (phím `D`, tối đa 500 điểm, tự rút gọn nét) bên cạnh Điểm và Vùng.
   Toạ độ vẫn theo pixel ảnh gốc, máy chủ kiểm tra mọi điểm nằm trong ảnh (`Coordinates::validateStroke`), CSDL lưu `annotations.points` (jsonb)
   với ràng buộc CHECK theo từng kiểu dấu. Bấm vào nét để mở góp ý; danh sách, Tìm góp ý và CSV hiện đúng kiểu dấu.
-- **Ảnh đính kèm trong trả lời**: nút 📎 Ảnh, kéo thả, hoặc chụp màn hình rồi **Ctrl+V** trong ô trả lời (PNG/JPEG ≤ 5 MB, tối đa 4 ảnh).
+- **Ảnh đính kèm trong trả lời**: nút Ảnh, kéo thả, hoặc chụp màn hình rồi **Ctrl+V** trong ô trả lời (PNG/JPEG ≤ 5 MB, tối đa 4 ảnh).
   Ảnh lưu ngoài thư mục public, phát qua `/attachment.php` sau khi kiểm tra người xem thuộc dự án; chỉ tác giả được đính kèm.
 - **Tô chỗ khác** (trang So sánh, phím `4`): ứng dụng tự so từng điểm ảnh giữa hai phiên bản, tô đỏ và đánh số các vùng thay đổi,
   báo % diện tích thay đổi; bấm số để phóng tới vùng; chỉnh Độ nhạy, bật/tắt làm mờ phần giống nhau. Chạy hoàn toàn trên trình duyệt (`diff.js`).
@@ -108,7 +132,7 @@
 - **Thuộc tính góp ý:** mức ưu tiên (Thấp → Khẩn cấp), nhãn phân loại (Bố cục, Màu sắc, Chữ & phông, Nội dung, Trải nghiệm, Trợ năng),
   người phụ trách (phải là thành viên dự án), hạn xử lý và cảnh báo quá hạn.
 - **Ghi chú xử lý** cho từng góp ý (≤ 4000 ký tự), có khoá lạc quan và báo xung đột giữ nguyên chữ đang gõ.
-- **Cảm xúc** 👍 ❤️ 🎉 👀 trên nhận xét và trả lời; **@nhắc tên** thành viên có gợi ý.
+- **Cảm xúc**  ❤️ 🎉 👀 trên nhận xét và trả lời; **@nhắc tên** thành viên có gợi ý.
 - **Nhật ký hoạt động** (`annotation_events`) ghi mọi thay đổi; dòng thời gian trong từng góp ý, tab *Hoạt động*, trang dự án.
 - Trình xem mới: thanh công cụ nổi, **ô soạn góp ý nổi cạnh dấu**, thẻ xem nhanh khi rê chuột, toạ độ con trỏ theo px ảnh gốc,
   ẩn dấu / ẩn đã xử lý, chuyển màn hình, nút phiên bản, phím tắt, thu gọn bảng góp ý.

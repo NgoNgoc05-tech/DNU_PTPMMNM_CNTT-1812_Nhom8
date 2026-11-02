@@ -307,3 +307,22 @@ CREATE TABLE IF NOT EXISTS app_state (
     value      varchar(200) NOT NULL DEFAULT '',
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- =====================================================================
+-- Bản 2.5: chỉ mục cho ~100 người dùng / hàng nghìn góp ý (mọi khoá ngoại hay truy vấn đều có chỉ mục)
+-- =====================================================================
+CREATE INDEX IF NOT EXISTS project_members_user ON project_members (user_id, project_id);
+CREATE INDEX IF NOT EXISTS screens_project ON screens (project_id, id);
+CREATE INDEX IF NOT EXISTS annotations_created_by ON annotations (created_by);
+CREATE INDEX IF NOT EXISTS annotations_open_due ON annotations (due_date) WHERE status = 'OPEN' AND due_date IS NOT NULL;
+CREATE INDEX IF NOT EXISTS comments_parent ON comments (parent_id) WHERE parent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS comments_author ON comments (author_id);
+CREATE INDEX IF NOT EXISTS comment_reactions_comment ON comment_reactions (comment_id);
+CREATE INDEX IF NOT EXISTS annotation_events_created ON annotation_events (created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_user_id ON notifications (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS notifications_annotation ON notifications (annotation_id) WHERE annotation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS support_tickets_user ON support_tickets (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS support_tickets_status ON support_tickets (status, id DESC);
+CREATE INDEX IF NOT EXISTS project_invitations_user ON project_invitations (user_id) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS projects_created_by ON projects (created_by);
+CREATE INDEX IF NOT EXISTS admin_log_created ON admin_log (id DESC);

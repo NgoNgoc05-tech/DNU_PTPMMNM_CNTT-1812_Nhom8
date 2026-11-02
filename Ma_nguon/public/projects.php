@@ -17,21 +17,19 @@ if (isPost()) {
         $error = errorMessage($ex->errorCode);
     }
 }
-$all = $repo->listForUser($user['id']);
 $f = ['q' => field($_GET, 'q'), 'view' => field($_GET, 'view') === 'archived' ? 'archived' : 'active',
     'role' => in_array(field($_GET, 'role'), ['ADMIN', 'COMMENT', 'VIEW', 'OWNER'], true) ? field($_GET, 'role') : '',
     'state' => in_array(field($_GET, 'state'), ['open', 'done', 'empty'], true) ? field($_GET, 'state') : '',
     'sort' => in_array(field($_GET, 'sort'), ['activity', 'name', 'open', 'created'], true) ? field($_GET, 'sort') : 'activity'];
-$projects = ProjectRepository::filter($all, $f, $user['id']);
-$activeAll = array_values(array_filter($all, fn ($p) => $p['archived_at'] === null));
-$archivedCount = count($all) - count($activeAll);
+// Bản 2.5: lọc, sắp xếp và phân trang ngay trong CSDL — mỗi trang chỉ lấy 9/18/36 dự án.
+$views = $repo->viewCounts($user['id']);
+$pg = Paginator::fromRequest($repo->countForUser($user['id'], $f), $_GET, 9, [9, 18, 36]);
+$projects = $repo->pageForUser($user['id'], $f, $pg->perPage, $pg->offset());
 $filtering = $f['q'] !== '' || $f['role'] !== '' || $f['state'] !== '';
 $annotations = new AnnotationRepository($c);
 $mine = $annotations->assignedTo($user['id'], 5);
 $myCountAll = $annotations->countAssigned($user['id']);
 $invites = $repo->invitationsFor($user['id']);
-$totalOpen = array_sum(array_map(fn ($p) => (int) $p['open_items'], $activeAll));
-$totalAll = array_sum(array_map(fn ($p) => (int) $p['total_items'], $activeAll));
 $hour = (int) date('G');
 $greet = $hour < 11 ? 'Chào buổi sáng' : ($hour < 14 ? 'Chào buổi trưa' : ($hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối'));
 $firstName = preg_split('/\s+/u', trim((string) preg_replace('/\(.*?\)/u', '', $user['name'])));
@@ -41,10 +39,8 @@ require __DIR__ . '/../templates/header.php';
 ?>
 <div class="page-head">
 <div>
-<h1><?= e($greet) ?>, <?= e(end($firstName)) ?> 👋</h1>
-<p class="summary-line"><a href="/inbox.php" class="summary-pill mine" title="Góp ý chưa xử lý mà bạn là người phụ trách — cùng con số trên menu “Việc của tôi”"><?= icon('inbox', 'sm') ?><strong><?= $myCountAll ?></strong> việc của tôi</a>
-<span class="summary-pill" title="Mọi góp ý chưa xử lý trong các dự án đang hoạt động bạn tham gia, giao cho ai cũng tính"><?= icon('pin', 'sm') ?><strong><?= $totalOpen ?></strong>/<?= $totalAll ?> góp ý chưa xử lý trong <?= count($activeAll) ?> dự án</span>
-<?= $invites !== [] ? '<a class="summary-pill invite" href="#invites">' . icon('users', 'sm') . '<strong>' . count($invites) . '</strong> lời mời đang chờ</a>' : '' ?></p>
+<h1 class="greet"><?= e($greet) ?>, <?= e(end($firstName)) ?> <span class="greet-icon" aria-hidden="true"><?= icon('wave') ?></span></h1>
+<?php if ($invites !== []): ?><p class="summary-line"><a class="summary-pill invite" href="#invites"><?= icon('users', 'sm') ?><strong><?= count($invites) ?></strong> lời mời tham gia dự án đang chờ bạn trả lời</a></p><?php endif; ?>
 </div>
 <div class="actions"><button type="button" class="btn" data-open="dlg-new-project"><?= icon('plus') ?>Dự án mới</button></div>
 </div>
@@ -78,14 +74,15 @@ require __DIR__ . '/../templates/header.php';
 
 <div class="layout-side">
 <section>
-<div class="section-title"><h2><?= icon('folder') ?><?= $f['view'] === 'archived' ? 'Dự án đã lưu trữ' : 'Dự án của tôi' ?> <span class="count"><?= count($projects) ?></span></h2>
+<div class="section-title"><h2><?= icon('folder') ?><?= $f['view'] === 'archived' ? 'Dự án đã lưu trữ' : 'Dự án của tôi' ?> <span class="count"><?= $pg->total ?></span></h2>
 <nav class="segmented" aria-label="Dự án đang hoạt động hoặc đã lưu trữ">
-<a href="/projects.php"<?= $f['view'] === 'active' ? ' aria-current="page"' : '' ?>>Đang hoạt động <span class="n"><?= count($activeAll) ?></span></a>
-<a href="/projects.php?view=archived"<?= $f['view'] === 'archived' ? ' aria-current="page"' : '' ?>><?= icon('archive', 'sm') ?>Đã lưu trữ <span class="n"><?= $archivedCount ?></span></a>
+<a href="/projects.php"<?= $f['view'] === 'active' ? ' aria-current="page"' : '' ?>>Đang hoạt động <span class="n"><?= $views['active'] ?></span></a>
+<a href="/projects.php?view=archived"<?= $f['view'] === 'archived' ? ' aria-current="page"' : '' ?>><?= icon('archive', 'sm') ?>Đã lưu trữ <span class="n"><?= $views['archived'] ?></span></a>
 </nav></div>
 <form method="get" action="/projects.php" class="project-filter" role="search" id="project-filter">
 <?php if ($f['view'] === 'archived'): ?><input type="hidden" name="view" value="archived"><?php endif; ?>
-<div class="pf-search"><?= icon('search', 'sm') ?><input type="search" name="q" value="<?= e($f['q']) ?>" placeholder="Tìm theo tên dự án, mô tả, người tạo…" aria-label="Tìm dự án" data-live-filter></div>
+<input type="hidden" name="per" value="<?= $pg->perPage ?>">
+<div class="pf-search"><?= icon('search', 'sm') ?><input type="search" name="q" value="<?= e($f['q']) ?>" placeholder="Tìm theo tên dự án, mô tả, người tạo… (Enter để tìm mọi trang)" aria-label="Tìm dự án" data-live-filter></div>
 <select name="role" aria-label="Lọc theo quyền" data-autosubmit>
 <?php foreach (['' => 'Mọi quyền', 'OWNER' => 'Tôi tạo', 'ADMIN' => 'Quản lý', 'COMMENT' => 'Góp ý', 'VIEW' => 'Chỉ xem'] as $k => $label): ?><option value="<?= $k ?>"<?= $f['role'] === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
 </select>
@@ -102,7 +99,7 @@ require __DIR__ . '/../templates/header.php';
 <div class="card empty-state">
 <div class="empty-art"><?= icon($f['view'] === 'archived' ? 'archive' : 'search') ?></div>
 <h3><?= $filtering ? 'Không có dự án phù hợp' : 'Chưa có dự án nào được lưu trữ' ?></h3>
-<p><?= $filtering ? 'Thử từ khoá khác hoặc bỏ bớt bộ lọc.' : 'Dự án đã xong có thể lưu trữ ở nút ⚙ trong trang dự án để danh sách gọn hơn; dữ liệu vẫn giữ nguyên.' ?></p>
+<p><?= $filtering ? 'Thử từ khoá khác hoặc bỏ bớt bộ lọc.' : 'Dự án đã xong có thể lưu trữ ở nút Cài đặt (bánh răng) trong trang dự án để danh sách gọn hơn; dữ liệu vẫn giữ nguyên.' ?></p>
 </div>
 <?php elseif ($projects === []): ?>
 <div class="card empty-state">
@@ -131,9 +128,10 @@ require __DIR__ . '/../templates/header.php';
 </span>
 </a>
 <?php endforeach; ?>
-<?php if ($f['view'] === 'active' && !$filtering): ?><button type="button" class="card new-card" data-open="dlg-new-project"><span><?= icon('plus') ?><br><strong>Tạo dự án mới</strong><br><span class="hint">Mời thành viên, tải ảnh thiết kế</span></span></button><?php endif; ?>
-<p class="hint live-empty" id="live-empty" hidden>Không có dự án nào khớp từ khoá.</p>
+<?php if ($f['view'] === 'active' && !$filtering && $pg->page === $pg->pages): ?><button type="button" class="card new-card" data-open="dlg-new-project"><span><?= icon('plus') ?><br><strong>Tạo dự án mới</strong><br><span class="hint">Mời thành viên, tải ảnh thiết kế</span></span></button><?php endif; ?>
+<p class="hint live-empty" id="live-empty" hidden>Không có dự án nào khớp từ khoá ở trang này — bấm Enter để tìm trong mọi trang.</p>
 </div>
+<?= $pg->render('/projects.php', ['view' => $f['view'] === 'archived' ? 'archived' : '', 'q' => $f['q'], 'role' => $f['role'], 'state' => $f['state'], 'sort' => $f['sort'] === 'activity' ? '' : $f['sort']], 'dự án') ?>
 <?php endif; ?>
 </section>
 
@@ -142,7 +140,7 @@ require __DIR__ . '/../templates/header.php';
 <div class="section-title"><h2><?= icon('inbox') ?>Việc của tôi <span class="count"><?= $myCountAll ?></span></h2><a class="hint" href="/inbox.php">Xem tất cả</a></div>
 <p class="hint mt-0">Góp ý chưa xử lý giao cho bạn phụ trách, gần hạn trước.</p>
 <?php if ($mine === []): ?>
-<p class="hint">Không có góp ý nào đang chờ bạn xử lý. 🎉</p>
+<p class="hint empty-ok"><?= icon('check-circle', 'sm') ?>Không có góp ý nào đang chờ bạn xử lý.</p>
 <?php else: ?>
 <ul class="feed">
 <?php foreach ($mine as $m): ?>

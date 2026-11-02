@@ -38,9 +38,9 @@ final class Assistant
         ['So sánh hai phiên bản', ['so sanh', 'compare', 'doi chieu', 'thanh truot', 'chong mo', 'canh nhau', 'swipe', 'to do', 'cho khac', 'khac nhau', 'thay doi', 'diff'],
             "Trang So sánh có 4 chế độ: Cạnh nhau (phím 1), Thanh trượt (phím 2 — kéo để thấy cũ/mới), Chồng mờ (phím 3) và Tô chỗ khác (phím 4 — ứng dụng tự tô đỏ và đánh số các vùng ảnh đã thay đổi; bấm số để phóng tới, kéo Độ nhạy nếu thấy quá nhiều/ít). Chọn tab “Góp ý trên v1” rồi bấm từng góp ý để kiểm tra trên bản mới và xác nhận đã xử lý."],
         ['Mũi tên, vẽ tay và ảnh đính kèm', ['mui ten', 've tay', 'arrow', 've tu do', 'net ve', 'dinh kem', 'anh chup', 'chup man hinh', 'dan anh', 'screenshot'],
-            "Trên thanh công cụ dưới ảnh: Mũi tên (phím A) — kéo từ đuôi tới đầu mũi tên; Vẽ tay (phím D) — giữ chuột và vẽ tự do. Thả chuột là hiện ô soạn góp ý. Bấm biểu tượng 🎨 trên thanh công cụ để chọn màu nét (vùng, mũi tên, vẽ tay). Muốn kèm ảnh chụp trong trả lời: bấm 📎 Ảnh, kéo thả tệp, hoặc chụp màn hình rồi bấm Ctrl+V trong ô trả lời (PNG/JPEG ≤ 5 MB, tối đa 4 ảnh)."],
+            "Trên thanh công cụ dưới ảnh: Mũi tên (phím A) — kéo từ đuôi tới đầu mũi tên; Vẽ tay (phím D) — giữ chuột và vẽ tự do. Thả chuột là hiện ô soạn góp ý. Bấm biểu tượng trên thanh công cụ để chọn màu nét (vùng, mũi tên, vẽ tay). Muốn kèm ảnh chụp trong trả lời: bấm Ảnh, kéo thả tệp, hoặc chụp màn hình rồi bấm Ctrl+V trong ô trả lời (PNG/JPEG ≤ 5 MB, tối đa 4 ảnh)."],
         ['Xoá ảnh tải nhầm', ['xoa anh', 'xoa phien ban', 'tai nham', 'xoa man hinh', 'xoa du an', 'xoa', 'delete', 'go bo'],
-            "Người có quyền Quản lý mở màn hình → nút ⚙ (Thêm thao tác):\n• “Xoá phiên bản đang xem” — bỏ ảnh tải nhầm cùng các góp ý trên phiên bản đó (không xoá được nếu chỉ còn 1 phiên bản).\n• “Xoá màn hình” — xoá màn hình và mọi phiên bản.\nXoá dự án: trang dự án → ⚙ → Vùng nguy hiểm, chỉ người tạo dự án, phải gõ lại tên dự án để xác nhận. Thao tác xoá không hoàn tác được."],
+            "Người có quyền Quản lý mở màn hình → nút Cài đặt (bánh răng) (Thêm thao tác):\n• “Xoá phiên bản đang xem” — bỏ ảnh tải nhầm cùng các góp ý trên phiên bản đó (không xoá được nếu chỉ còn 1 phiên bản).\n• “Xoá màn hình” — xoá màn hình và mọi phiên bản.\nXoá dự án: trang dự án → Cài đặt (bánh răng) → Vùng nguy hiểm, chỉ người tạo dự án, phải gõ lại tên dự án để xác nhận. Thao tác xoá không hoàn tác được."],
         ['Ghi chú xử lý', ['ghi chu', 'note', 'cach sua', 'thong so'],
             "Mỗi góp ý có khối Ghi chú xử lý để ghi cách sửa, thông số, liên kết tài liệu. Bấm “Thêm ghi chú” / “Sửa ghi chú”. Nếu người khác vừa sửa cùng lúc, ứng dụng báo xung đột và vẫn giữ chữ bạn đã gõ."],
         ['Ưu tiên, nhãn, người phụ trách, hạn', ['uu tien', 'nhan', 'phu trach', 'giao viec', 'han', 'deadline', 'qua han', 'ngay'],
@@ -56,9 +56,9 @@ final class Assistant
         ['Hồ sơ và mật khẩu', ['ho so', 'profile', 'doi ten', 'mat khau', 'password', 'doi mat khau', 'tai khoan', 'quen mat khau', 'dat lai mat khau', 'reset'],
             "Bấm ảnh đại diện ở góc phải → Hồ sơ của tôi để đổi họ tên, chức danh và đổi mật khẩu (cần mật khẩu hiện tại). Quên mật khẩu: ở trang Đăng nhập bấm “Quên mật khẩu?”, nhập email (và cách liên hệ). Bạn nhận link đặt lại mật khẩu qua email, hoặc bộ phận hỗ trợ gửi link cho bạn; link dùng một lần, hết hạn sau 30 phút."],
         ['Tìm, lọc và lưu trữ dự án', ['tim du an', 'loc du an', 'sap xep', 'luu tru', 'archive', 'khoi phuc', 'an du an', 'du an cu'],
-            "Trang Dự án có ô tìm (tên, mô tả, người tạo — lọc ngay khi gõ), lọc theo quyền và tiến độ, sắp xếp theo hoạt động / số góp ý chờ / tên. Dự án đã xong: mở dự án → ⚙ → Lưu trữ dự án; dự án chuyển sang mục “Đã lưu trữ”, chỉ xem, bấm Khôi phục để làm tiếp."],
+            "Trang Dự án có ô tìm (tên, mô tả, người tạo — lọc ngay khi gõ), lọc theo quyền và tiến độ, sắp xếp theo hoạt động / số góp ý chờ / tên. Dự án đã xong: mở dự án → Cài đặt (bánh răng) → Lưu trữ dự án; dự án chuyển sang mục “Đã lưu trữ”, chỉ xem, bấm Khôi phục để làm tiếp."],
         ['Nhắc hạn và Việc của tôi', ['nhac han', 'sap den han', 'han chot', 'deadline', 'nhac nho', 'viec cua toi', 'viec giao'],
-            "“Việc của tôi” là các góp ý chưa xử lý giao cho bạn phụ trách (dự án đang hoạt động) — con số trên menu và trang Dự án là một. Góp ý có hạn hôm nay hoặc ngày mai được nhắc một lần trong chuông 🔔 (⏰ Nhắc hạn); bật/tắt email nhắc hạn ở Hồ sơ → Nhắc hạn xử lý."],
+            "“Việc của tôi” là các góp ý chưa xử lý giao cho bạn phụ trách (dự án đang hoạt động) — con số trên menu và trang Dự án là một. Góp ý có hạn hôm nay hoặc ngày mai được nhắc một lần trong chuông (biểu tượng chuông) (Nhắc hạn); bật/tắt email nhắc hạn ở Hồ sơ → Nhắc hạn xử lý."],
         ['Trả lời theo luồng', ['tra loi rieng', 'theo luong', 'trich dan', 'tra loi tin', 'thread'],
             "Trong trao đổi của một góp ý, bấm “Trả lời” dưới tin muốn đáp: ô soạn hiện “Trả lời …” và tự thêm @tên. Trả lời gửi đi có trích dẫn ngắn của tin gốc, bấm trích dẫn để nhảy tới tin đó; người viết tin gốc nhận thông báo."],
         ['Quản trị hệ thống', ['quan tri', 'admin', 'khoa tai khoan', 'mo khoa', 'thong ke', 'quan ly nguoi dung', 'bi khoa'],
@@ -72,7 +72,7 @@ final class Assistant
         ['Tài khoản dữ liệu mẫu', ['tai khoan mau', 'demo', 'dang nhap', 'designer', 'reviewer', 'viewer'],
             "Tài khoản mẫu: designer@pinpoint.test (Quản lý), reviewer@pinpoint.test (Góp ý), viewer@pinpoint.test (Chỉ xem dự án A). Mật khẩu chung Pinpoint@123."],
         ['Liên hệ hỗ trợ', ['ho tro', 'lien he', 'support', 'gap nguoi', 'bao loi', 'loi', 'ai xu ly', 'dang cho', 'tra loi yeu cau'],
-            "Mở trang Hỗ trợ (menu trên cùng) → “Gửi yêu cầu hỗ trợ”, chọn loại (Hỏi cách dùng, Báo lỗi, Góp ý tính năng, Tài khoản), mô tả rõ và gửi. Yêu cầu được chuyển tới Bộ phận hỗ trợ Pinpoint: nhân viên hỗ trợ nhận thông báo, trả lời trên trang “Xử lý yêu cầu”. Khi có câu trả lời bạn nhận thông báo 🔔 và đọc ở mục “Yêu cầu của tôi” (trạng thái chuyển từ Đang chờ sang Đã trả lời)."],
+            "Mở trang Hỗ trợ (menu trên cùng) → “Gửi yêu cầu hỗ trợ”, chọn loại (Hỏi cách dùng, Báo lỗi, Góp ý tính năng, Tài khoản), mô tả rõ và gửi. Yêu cầu được chuyển tới Bộ phận hỗ trợ Pinpoint: nhân viên hỗ trợ nhận thông báo, trả lời trên trang “Xử lý yêu cầu”. Khi có câu trả lời bạn nhận thông báo (biểu tượng chuông) và đọc ở mục “Yêu cầu của tôi” (trạng thái chuyển từ Đang chờ sang Đã trả lời)."],
     ];
 
     /** Bỏ dấu tiếng Việt và viết thường để so khớp. */

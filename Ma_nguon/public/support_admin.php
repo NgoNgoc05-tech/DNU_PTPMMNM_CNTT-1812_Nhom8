@@ -13,6 +13,7 @@ if (($user['is_support'] ?? 'f') !== 't' && ($user['is_admin'] ?? 'f') !== 't') 
 $support = new SupportRepository($c);
 $error = '';
 $filter = (string) ($_GET['status'] ?? 'OPEN');
+$filter = $filter === 'ALL' ? '' : $filter; // ALL = Tất cả (dùng trong liên kết phân trang)
 if ($filter !== '' && !isset(SupportRepository::STATUSES[$filter])) {
     $filter = 'OPEN';
 }
@@ -44,7 +45,8 @@ if (isPost()) {
 $issued = $_SESSION['issued_link'] ?? null;
 unset($_SESSION['issued_link']);
 $counts = $support->counts();
-$tickets = $support->listAll($filter);
+$pg = Paginator::fromRequest($filter === '' ? array_sum($counts) : $counts[$filter], $_GET, 10, [10, 20, 50]);
+$tickets = $support->listAll($filter, $pg->perPage, $pg->offset());
 $title = 'Bộ phận hỗ trợ';
 $active = 'support';
 require __DIR__ . '/../templates/header.php';
@@ -112,4 +114,5 @@ require __DIR__ . '/../templates/header.php';
 </article>
 <?php endforeach; ?>
 </div>
+<?= $pg->render('/support_admin.php', ['status' => $filter === '' ? 'ALL' : $filter], 'yêu cầu') ?>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

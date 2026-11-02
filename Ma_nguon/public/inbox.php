@@ -6,8 +6,11 @@ declare(strict_types=1);
 require __DIR__ . '/../src/web.php';
 $c = db();
 $user = Auth::requireUser($c);
-$items = (new AnnotationRepository($c))->assignedTo($user['id'], 200);
-$overdue = array_filter($items, fn ($m) => $m['overdue']);
+$repo = new AnnotationRepository($c);
+// Bản 2.5: phân trang ở CSDL; nhóm Quá hạn / Đến hạn / Còn lại áp dụng trên trang đang xem (danh sách đã sắp theo hạn).
+$pg = Paginator::fromRequest($repo->countAssigned($user['id']), $_GET, 20);
+$items = $repo->assignedTo($user['id'], $pg->perPage, $pg->offset());
+$overdueTotal = $repo->countAssignedOverdue($user['id']);
 $groups = ['Quá hạn' => [], 'Đến hạn trong 3 ngày' => [], 'Còn lại' => []];
 foreach ($items as $m) {
     if ($m['overdue']) {
@@ -23,7 +26,7 @@ $active = 'inbox';
 require __DIR__ . '/../templates/header.php';
 ?>
 <div class="page-head">
-<div><h1>Việc của tôi</h1><p><?= count($items) ?> góp ý chưa xử lý được giao cho bạn<?= $overdue ? ' · <strong>' . count($overdue) . ' quá hạn</strong>' : '' ?>. Sắp theo hạn rồi theo mức ưu tiên.</p></div>
+<div><h1>Việc của tôi</h1><p><?= $pg->total ?> góp ý chưa xử lý được giao cho bạn<?= $overdueTotal ? ' · <strong>' . $overdueTotal . ' quá hạn</strong>' : '' ?>. Sắp theo hạn rồi theo mức ưu tiên.</p></div>
 </div>
 <?php if ($items === []): ?>
 <div class="card empty-state"><div class="empty-art"><?= icon('check-circle') ?></div><h3>Không còn việc nào</h3><p>Khi ai đó giao góp ý cho bạn, nó sẽ xuất hiện ở đây.</p></div>
@@ -48,5 +51,6 @@ require __DIR__ . '/../templates/header.php';
 </table>
 </div>
 <?php endforeach; ?>
+<?= $pg->render('/inbox.php', [], 'việc') ?>
 <?php endif; ?>
 <?php require __DIR__ . '/../templates/footer.php'; ?>

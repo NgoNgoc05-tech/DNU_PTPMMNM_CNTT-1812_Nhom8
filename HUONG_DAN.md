@@ -71,10 +71,10 @@ bash lab.sh test
 
 | Phần | Tệp | Kết quả cần có |
 |---|---|---|
-| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=73 FAILED=0` |
+| Đơn vị (không cần CSDL) | tests/run.php | `TESTS=81 FAILED=0` |
 | JavaScript: toạ độ, tô chỗ khác, rút gọn nét vẽ | tests/js/coords.test.mjs, tests/js/drawing.test.mjs | `# pass 10`, `# fail 0` |
-| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0 → 2.4 | tests/integration.php | `TESTS=180 FAILED=0` |
-| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0 → 2.4, lời mời, hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | tests/http.php | `TESTS=67 FAILED=0` |
+| Tích hợp PostgreSQL: 5 phép thử bắt buộc + tính năng 2.0 → 2.5 | tests/integration.php | `TESTS=197 FAILED=0` |
+| HTTP: quyền ở máy chủ, CSRF, URL chéo dự án, API 2.0 → 2.5, phân trang, lời mời, hỗ trợ, ảnh đính kèm, quên mật khẩu, quản trị | tests/http.php | `TESTS=74 FAILED=0` |
 | Tổng | | `KET_QUA=TAT_CA_DAT` |
 
 Bộ tích hợp và bộ HTTP tự nạp một bộ dữ liệu riêng (email có hậu tố ngẫu nhiên), rồi tự xoá khi chạy xong. Dữ liệu demo không bị ảnh hưởng.
@@ -86,10 +86,42 @@ Kiểm thử trên trình duyệt thật (tuỳ chọn, cũng chạy tự độn
 npm install
 npx playwright install chromium
 bash lab.sh run          # terminal 1
-bash lab.sh e2e          # terminal 2 → TESTS=82 FAILED=0
+bash lab.sh e2e          # terminal 2 → TESTS=86 FAILED=0
 ```
 
 Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Chạy xong có thể `bash lab.sh reset` để đưa dữ liệu demo về ban đầu.
+
+### Thử tải ở quy mô thật (~100 người dùng)
+
+```bash
+php tools/seed_load.php          # 100 người dùng load001…load100@pinpoint.test (mật khẩu Pinpoint@123), 30 dự án, ~2 000 góp ý
+php tools/bench.php              # đo thời gian các truy vấn chính, mục tiêu < 50 ms
+php tools/seed_load.php --clean  # xoá sạch dữ liệu thử tải, không đụng dữ liệu khác
+```
+
+Kết quả trên máy nhóm (PostgreSQL 16, WSL):
+
+```
+Dữ liệu: 105 người dùng · 33 dự án · 2046 góp ý · 6105 nhận xét · 3711 thông báo
+
+    2.6 ms  Trang Dự án: đếm + 1 trang (9 dự án), sắp theo hoạt động
+    1.4 ms  Trang Dự án: tìm "app" + lọc còn góp ý chờ
+    1.5 ms  Menu "Việc của tôi" (đếm)
+    2.4 ms  Trang Việc của tôi (20 dòng)
+    4.7 ms  Trình xem: góp ý + trao đổi của 1 phiên bản
+    4.0 ms  Tìm góp ý: đếm + trang 25 dòng, ưu tiên cao trước
+    8.9 ms  Tìm góp ý theo nội dung "nút"
+    0.9 ms  Thống kê dự án
+    3.0 ms  Chuông: số chưa đọc + 15 thông báo
+    2.0 ms  Chuông tự cập nhật (notif_poll)
+    1.7 ms  Quản trị: thống kê toàn hệ thống
+    1.8 ms  Quản trị: 20 người dùng, nhiều góp ý nhất
+    2.7 ms  Quản trị: 20 dự án, nhiều góp ý chờ nhất
+
+CHAM_NHAT=8.9 ms | DAT (< 50 ms)
+```
+
+Đăng nhập `load001@pinpoint.test` hoặc `admin@pinpoint.test` để xem phân trang ở trang Dự án, Tìm góp ý, Việc của tôi, Thông báo và Quản trị.
 
 ## 6. Kịch bản trình diễn
 
@@ -106,7 +138,7 @@ Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Ch
    - Chọn **Vùng** (phím `R`), kéo quanh ba thẻ món và nhận xét. Dấu **#2** xuất hiện.
 5. Thử bấm vào phần lề xám quanh ảnh: ứng dụng báo “phần lề trống không được tính”.
 6. Quay lại cửa sổ **designer** (biểu tượng *Việc của tôi* đã có số mới). Mở dấu #1:
-   - Viết trả lời rồi *Gửi trả lời*; thả cảm xúc 👍 vào nhận xét.
+   - Viết trả lời rồi *Gửi trả lời*; thả cảm xúc  vào nhận xét.
    - Bấm **Thêm ghi chú** ở khối *Ghi chú xử lý*, ghi cách sẽ sửa (ví dụ “Chuyển nút sang cột trái, căn lưới 8 px”).
    - Reviewer bấm lại vào dấu sẽ thấy trả lời, ghi chú và **Lịch sử** ghi đủ từng thay đổi.
 7. Đăng nhập **viewer**: không có công cụ Điểm/Vùng, thuộc tính chỉ đọc, bấm lên ảnh không tạo được gì.
@@ -124,14 +156,14 @@ Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Ch
 
 ### Tình huống 3 (bản 2.1, 2.2) — Thông báo, xoá ảnh tải nhầm, hạn xử lý, hỗ trợ
 
-1. **reviewer** mở một góp ý, trả lời có `@Nguyễn Thu Trang`. Ở cửa sổ **designer**, biểu tượng 🔔 hiện số đỏ; bấm vào để xem
+1. **reviewer** mở một góp ý, trả lời có `@Nguyễn Thu Trang`. Ở cửa sổ **designer**, biểu tượng hiện số đỏ; bấm vào để xem
    “Lê Minh Đức nhắc tới bạn”, bấm thông báo để mở đúng góp ý. Giao việc cho ai, người đó cũng nhận thông báo.
-2. **designer** tải nhầm một ảnh làm phiên bản mới → bấm ⚙ trên thanh công cụ → **Xoá phiên bản đang xem** → xác nhận. Phiên bản và
+2. **designer** tải nhầm một ảnh làm phiên bản mới → bấm nút Cài đặt (bánh răng) trên thanh công cụ → **Xoá phiên bản đang xem** → xác nhận. Phiên bản và
    góp ý trên nó bị xoá, các phiên bản khác giữ nguyên.
 3. Ở ô **Hạn xử lý** gõ `11/05/2026` theo dạng **tháng/ngày/năm** (= ngày 5 tháng 11) hoặc bấm biểu tượng lịch để mở lịch tiếng Việt
    (Tháng 11, 2026 · T2…CN · *Hôm nay* · *Xoá hạn*; dùng phím mũi tên để chọn ngày).
 4. Bấm **Hỏi trợ lý** ở góc phải dưới, hỏi “làm sao so sánh hai phiên bản?”. Vào **Hỗ trợ** để xem câu hỏi thường gặp và gửi yêu cầu.
-5. **Ai xử lý yêu cầu hỗ trợ?** (bản 2.2) Đăng nhập tài khoản **bộ phận hỗ trợ** `hotro@pinpoint.test` / `Pinpoint@123`: chuông 🔔 báo
+5. **Ai xử lý yêu cầu hỗ trợ?** (bản 2.2) Đăng nhập tài khoản **bộ phận hỗ trợ** `hotro@pinpoint.test` / `Pinpoint@123`: chuông báo
    có yêu cầu mới, menu có thêm **Xử lý yêu cầu** (`/support_admin.php`). Viết câu trả lời, chọn trạng thái rồi bấm *Lưu và gửi trả lời*.
    Người gửi nhận thông báo và thấy câu trả lời ở mục *Yêu cầu của tôi* (trạng thái *Đang chờ* → *Đã trả lời*).
    Cấp quyền hỗ trợ cho tài khoản khác: `php tools/support.php grant email@...` (thu hồi: `revoke`). Vẫn trả lời được bằng dòng lệnh:
@@ -142,7 +174,7 @@ Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Ch
 
 1. **reviewer** mở màn hình “Trang chủ”, chọn **Mũi tên** (phím `A`), kéo từ nút “Đặt ngay” sang chỗ muốn dời tới rồi viết góp ý.
    Chọn **Vẽ tay** (phím `D`), giữ chuột khoanh quanh cụm thẻ món. Bấm vào nét bất kỳ để mở góp ý của nó.
-2. Trong ô **Trả lời**, chụp màn hình (`Win + Shift + S`) rồi bấm `Ctrl + V` — ảnh hiện ngay dưới ô; hoặc bấm 📎 **Ảnh** để chọn tệp.
+2. Trong ô **Trả lời**, chụp màn hình (`Win + Shift + S`) rồi bấm `Ctrl + V` — ảnh hiện ngay dưới ô; hoặc bấm **Ảnh** để chọn tệp.
    Bấm *Gửi trả lời*: ảnh hiện thu nhỏ trong trao đổi, bấm để xem cỡ thật.
 3. Để cửa sổ **designer** ở trang Dự án. Khi reviewer viết trả lời có `@Nguyễn Thu Trang`, trong vài giây góc màn hình designer
    hiện thẻ “Lê Minh Đức nhắc tới bạn”, chuông tăng số — không cần tải lại trang.
@@ -159,14 +191,14 @@ Bài e2e tạo thêm góp ý, ảnh đính kèm và một phiên bản ảnh. Ch
 
 1. Trang **Dự án**: dòng tóm tắt có “N việc của tôi” (bằng số trên menu) và “M/T góp ý chưa xử lý”. Gõ “cổng” vào ô tìm — danh sách lọc ngay;
    thử lọc *Tôi tạo*, *Còn góp ý chưa xử lý*, sắp xếp *Nhiều góp ý chờ nhất*.
-2. Mở một dự án → ⚙ → **Lưu trữ dự án** → hộp xác nhận hiện giữa màn hình → **Đồng ý**. Dự án hiện nhãn *Đã lưu trữ*, chỉ xem,
+2. Mở một dự án → Cài đặt → **Lưu trữ dự án** → hộp xác nhận hiện giữa màn hình → **Đồng ý**. Dự án hiện nhãn *Đã lưu trữ*, chỉ xem,
    nằm ở mục **Đã lưu trữ** của trang Dự án; bấm **Khôi phục dự án** để làm tiếp.
 3. Trong khung *Thành viên* bấm × cạnh một người: hộp “Xác nhận xoá” hiện giữa màn hình (bấm Huỷ để giữ lại).
 4. Trình xem: bấm biểu tượng 🎨 trên thanh công cụ, chọn màu, rồi vẽ tay / mũi tên / khoanh vùng — nét có đúng màu đã chọn.
 5. Mở một góp ý có trao đổi, bấm **Trả lời** dưới một tin: ô soạn hiện “Trả lời …” và tự thêm @tên. Gửi xong, trả lời có trích dẫn tin gốc;
    bấm trích dẫn để nhảy tới tin đó. @tên của chính bạn được tô vàng.
 6. **Nhắc hạn:** đặt *Hạn xử lý* là ngày mai cho một góp ý giao cho bạn → trong vòng 10 phút (hoặc chạy `php tools/reminders.php`)
-   chuông hiện “⏰ Nhắc hạn · góp ý sắp đến hạn”. Tắt/bật email nhắc hạn ở **Hồ sơ → Nhắc hạn xử lý**.
+   chuông hiện “Nhắc hạn · góp ý sắp đến hạn”. Tắt/bật email nhắc hạn ở **Hồ sơ → Nhắc hạn xử lý**.
 
 **Gửi email thật cho “Quên mật khẩu” và nhắc hạn (không bắt buộc):** đặt `PINPOINT_MAIL_FROM=ban@gmail.com` (và `PINPOINT_BASE_URL=https://…onrender.com`
 trên Render) khi máy chủ đã cấu hình được hàm `mail()` của PHP. Nếu không, ứng dụng tự chuyển yêu cầu cho bộ phận hỗ trợ như bước 5.
@@ -181,7 +213,7 @@ trên Render thêm biến này ở mục Environment Variables. Chỉ câu hỏi
 
 ### Mẹo khi trình diễn
 
-- Bấm biểu tượng 🌙 ở góc trên để chuyển giao diện tối; bấm biểu tượng bàn phím (hoặc phím `?`) để xem phím tắt.
+- Bấm biểu tượng ở góc trên để chuyển giao diện tối; bấm biểu tượng bàn phím (hoặc phím `?`) để xem phím tắt.
 - Nút *Ẩn góp ý đã xử lý* và *Ẩn mọi dấu* (phím `M`) trên thanh công cụ nổi giúp xem lại ảnh gốc.
 - `←` / `→` chuyển nhanh giữa các góp ý; `/` để tìm.
 
