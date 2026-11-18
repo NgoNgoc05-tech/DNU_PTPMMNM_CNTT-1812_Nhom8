@@ -365,6 +365,22 @@ try {
     throwsCode(fn () => (new ProjectRepository($c))->find($tmpP), 'NOT_FOUND', 'v23-admin-deleted-project');
     $actions = array_column($admin->recentLog(10), 'action');
     same(array_slice($actions, 0, 3), ['DELETE_PROJECT', 'JOIN_PROJECT', 'RESET_LINK'], 'v23-admin-actions-logged');
+    // Bản 2.6: đếm theo nhóm, khoá hàng loạt (bỏ qua chính mình), tạo tài khoản kèm link đặt mật khẩu, trang chi tiết
+    $cnt = $admin->userCounts();
+    same($cnt['active'] + $cnt['locked'], $cnt['all'], 'v26-user-counts-add-up');
+    same($admin->bulkLock($AD, [$V, $R, $AD], true, 'hàng loạt'), 2, 'v26-bulk-lock-skips-self');
+    same($admin->bulkLock($AD, [$V, $R], true), 0, 'v26-bulk-lock-skips-already-locked');
+    same($admin->bulkLock($AD, [$V, $R], false), 2, 'v26-bulk-unlock');
+    $made = $admin->createUser($AD, 'Người tạo bởi quản trị', 'admin-made+' . $suffix . '@pinpoint.test', 'Kiểm thử', true);
+    same([str_contains($made['link'], '/reset_password.php?token='), SupportRepository::isStaff($c, $made['id'])], [true, true], 'v26-admin-creates-user');
+    throwsCode(fn () => $admin->createUser($AD, 'Trùng', 'admin-made+' . $suffix . '@pinpoint.test'), 'EMAIL_TAKEN', 'v26-create-user-duplicate-email');
+    $det = $admin->userDetail($D);
+    same([$det['email'] !== '', is_array($det['project_list']), count($det['project_list']) >= 1], [true, true, true], 'v26-user-detail');
+    same($admin->countLog('LOCK') >= 2 && $admin->countLog('', 'admin-made+' . $suffix) === 1, true, 'v26-log-filters');
+    $pc = $admin->projectCounts();
+    same($pc['active'] + $pc['archived'], $pc['all'], 'v26-project-counts-add-up');
+    queryParams($c, 'DELETE FROM password_resets WHERE user_id = $1', [$made['id']]);
+    queryParams($c, 'DELETE FROM users WHERE id = $1', [$made['id']]);
     queryParams($c, "DELETE FROM admin_log WHERE admin_id = $1", [$AD]);
 
     echo "-- Bản 2.4: lưu trữ dự án, màu nét, trả lời theo luồng, nhắc hạn\n";

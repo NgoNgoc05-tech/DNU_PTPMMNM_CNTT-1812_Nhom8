@@ -406,7 +406,7 @@ try {
   await adm.goto(`${BASE}/admin.php`);
   check((await adm.$$('.stat')).length === 8 && await adm.$('svg.bar-chart rect') !== null, 'v23-admin-overview');
   await adm.screenshot({ path: path.join(OUT, 'v23-admin.png') });
-  await adm.goto(`${BASE}/admin.php?tab=users`);
+  await adm.goto(`${BASE}/admin.php?tab=users&q=viewer%40pinpoint.test`); // có 100 người dùng ảo nên tìm theo email
   const vrow = adm.locator('tr[data-user="viewer@pinpoint.test"]');
   await vrow.locator('summary').click();
   await vrow.locator('input[name=reason]').fill('E2E: thử khoá');
@@ -436,20 +436,24 @@ try {
   await designer.screenshot({ path: path.join(OUT, 'v25-issues.png') });
 
   // ================= Bản 2.4 =================
-  // Tên "Việc của tôi" thống nhất: số trên menu = số ở trang Dự án; nút trợ lý là icon tròn
+  // Tên "Việc giao cho bạn" thống nhất: số trên menu = số ở trang Dự án; nút trợ lý là icon tròn
   await designer.goto(`${BASE}/projects.php`);
   const navCount = (await designer.textContent('.main-nav a[href="/inbox.php"] .nav-count')).trim();
-  const pillCount = (await designer.textContent('aside .section-title:has-text("Việc của tôi") .count')).trim();
+  const pillCount = (await designer.textContent('aside .section-title:has-text("Việc giao cho bạn") .count')).trim();
   check(navCount === pillCount, 'v24-my-tasks-same-number', `${navCount} vs ${pillCount}`);
-  // Bản 2.5: bỏ hai ô tóm tắt trùng lặp dưới lời chào; mục đang chọn có màu
-  check(await designer.$('.summary-pill.mine') === null, 'v25-no-duplicate-summary');
+  // Bản 2.6: dòng chào ghi rõ hai con số khác nhau — "N việc giao cho bạn / M góp ý chờ trong toàn bộ dự án"
+  const mineText = (await designer.textContent('.summary-pill.mine')).replace(/\s+/g, ' ').trim();
+  const allText = (await designer.textContent('.summary-pill.all')).replace(/\s+/g, ' ').trim();
+  check(mineText === `${navCount} việc giao cho bạn` && /góp ý chờ xử lý trong toàn bộ dự án$/.test(allText), 'v26-summary-explains-numbers', `${mineText} | ${allText}`);
   const colors = await designer.evaluate(() => {
     const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
     return { nav: bg('.main-nav a[aria-current]'), seg: bg('.segmented [aria-current]'), segColor: getComputedStyle(document.querySelector('.segmented [aria-current]')).color };
   });
-  check(colors.seg === 'rgb(79, 70, 229)' && colors.segColor === 'rgb(255, 255, 255)' && colors.nav !== 'rgba(0, 0, 0, 0)', 'v25-selected-items-colored', JSON.stringify(colors));
+  check(colors.seg === 'rgb(2, 151, 222)' && colors.segColor === 'rgb(255, 255, 255)' && colors.nav !== 'rgba(0, 0, 0, 0)', 'v25-selected-items-colored', JSON.stringify(colors));
   const fab = await designer.$eval('#chat-open', (b) => { const r = b.getBoundingClientRect(); return { w: r.width, h: r.height, text: b.textContent.trim() }; });
   check(Math.abs(fab.w - fab.h) < 2 && fab.w <= 50 && fab.text === '', 'v24-assistant-button-round-icon', JSON.stringify(fab));
+  // Bản 2.6: nút trợ lý nằm trong thanh trên cùng, không còn nút nổi đè lên bảng bên phải
+  check(await designer.$('.site-header #chat-open') !== null && await designer.$('.chat-fab-btn') === null, 'v26-assistant-in-header');
   // Tìm dự án ngay khi gõ, rồi tìm ở máy chủ
   await designer.fill('#project-filter input[name=q]', 'cổng');
   const visibleCards = await designer.$$eval('.project-card[data-name]', (l) => l.filter((x) => !x.hidden).map((x) => x.querySelector('h2').textContent));

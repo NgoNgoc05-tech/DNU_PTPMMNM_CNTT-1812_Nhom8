@@ -57,13 +57,15 @@ git clone <địa-chỉ-kho-của-nhóm> pinpoint
 cd pinpoint/Ma_nguon
 bash lab.sh db-config     # nhập CSDL/tài khoản riêng (tạo theo HUONG_DAN.md, mục 2)
 bash lab.sh check
-bash lab.sh setup         # tạo bảng + dữ liệu mẫu
+bash lab.sh setup         # tạo bảng + dữ liệu mẫu + 100 người dùng ảo
 bash lab.sh run           # mở http://127.0.0.1:8115
 ```
 
 Đăng nhập bằng `designer@pinpoint.test`, `reviewer@pinpoint.test` hoặc `viewer@pinpoint.test`. Mật khẩu của cả ba là `Pinpoint@123`.
 Tài khoản bộ phận hỗ trợ (trả lời yêu cầu hỗ trợ ở menu **Xử lý yêu cầu**): `hotro@pinpoint.test` / `Pinpoint@123`.
 Tài khoản quản trị hệ thống (menu **Quản trị**): `admin@pinpoint.test` / `Pinpoint@123` — khi dùng thật hãy đổi mật khẩu.
+
+CSDL đã có dữ liệu từ bản trước thì thêm 100 người dùng ảo bằng `bash lab.sh seed-users` (email `…@demo.pinpoint.test`, mật khẩu `Pinpoint@123`).
 
 Kiểm thử (mở terminal thứ hai):
 
@@ -86,7 +88,7 @@ bash lab.sh e2e           # trình duyệt thật: 2 tình huống + phép thử
 | ![Mũi tên và vẽ tay](Hinh_anh/draw.png) | ![Tô đỏ chỗ khác giữa hai phiên bản](Hinh_anh/diff.png) |
 | ![Ảnh chụp đính kèm trong trả lời](Hinh_anh/attach.png) | ![Quản trị hệ thống](Hinh_anh/admin.png) |
 | ![Tìm, lọc, sắp xếp dự án](Hinh_anh/projects-filter.png) | ![Trao đổi theo luồng](Hinh_anh/thread.png) |
-| ![Phân trang và quản trị người dùng (dữ liệu thử tải 100 người)](Hinh_anh/pagination.png) | |
+| ![Quản trị người dùng: lọc theo nhóm, chọn nhiều để khoá, phân trang](Hinh_anh/pagination.png) | ![Trang chi tiết một người dùng](Hinh_anh/admin-user.png) |
 
 ## Tài liệu
 

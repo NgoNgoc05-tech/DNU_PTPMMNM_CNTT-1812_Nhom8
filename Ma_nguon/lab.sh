@@ -6,13 +6,14 @@ root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" || exit 2
 cd "$root" || exit 2
 port="${PORT:-8115}"
 usage() {
-  printf 'Cách dùng: bash lab.sh check | db-config | setup | run | test | e2e | sql | reset\n'
+  printf 'Cách dùng: bash lab.sh check | db-config | setup | seed-users | run | test | e2e | sql | reset\n'
   printf '  check     kiểm tra PHP, Git, PostgreSQL, kết nối CSDL\n'
   printf '  db-config lưu thông tin kết nối vào .local/db.json (không đưa lên Git)\n'
   printf '  setup     tạo bảng và nạp dữ liệu mẫu (bỏ qua nếu đã có dữ liệu)\n'
   printf '  run       chạy web tại http://127.0.0.1:%s (Ctrl+C để dừng)\n' "$port"
   printf '  test      chạy kiểm thử đơn vị, JS, tích hợp PostgreSQL và HTTP\n'
   printf '  e2e       kiểm thử trên trình duyệt thật (cần Node + Playwright, xem README)\n'
+  printf '  seed-users thêm 100 người dùng ảo để thử trang quản trị (chạy lại không trùng)\n'
   printf '  sql       mở psql vào CSDL đã cấu hình\n'
   printf '  reset     XOÁ dữ liệu Pinpoint rồi nạp lại mẫu (hỏi xác nhận)\n'
 }
@@ -64,6 +65,7 @@ case "${1:-help}" in
     command -v node >/dev/null 2>&1 || { echo 'NOT_RUN: cần Node.js'; exit 2; }
     [[ -d node_modules/playwright ]] || { echo 'NOT_RUN: chạy npm install trước (cài Playwright)'; exit 2; }
     node tests/e2e/browser.mjs ;;
+  seed-users) check_env || exit 2; php tools/seed_users.php "${2:-100}" ;;
   sql) need_php || exit 2; php tools/sql.php ;;
   reset) check_env || exit 2; php tools/reset.php ;;
   help|-h|--help) usage ;;

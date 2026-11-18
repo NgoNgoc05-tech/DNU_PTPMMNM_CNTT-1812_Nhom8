@@ -2,22 +2,33 @@
 
 declare(strict_types=1);
 
-// Bản 2.3 — Trang quản trị hệ thống (chỉ users.is_admin; mẫu: admin@pinpoint.test).
-//   ?tab=overview  thống kê toàn hệ thống, biểu đồ 14 ngày, dự án nhiều góp ý chưa xử lý nhất, nhật ký quản trị
-//   ?tab=users     tìm / lọc người dùng; khoá – mở khoá; cấp – bỏ quyền quản trị, bộ phận hỗ trợ; cấp link đặt lại mật khẩu
-//   ?tab=projects  mọi dự án của hệ thống; tham gia với quyền Quản lý để xem/can thiệp; xoá dự án (gõ lại tên)
+// Quản trị hệ thống (chỉ users.is_admin; mẫu: admin@pinpoint.test).
+// Bản 2.6: tách thành bảng điều khiển có thanh bên, mỗi mục là một trang riêng (giao diện ở templates/admin/):
+//   ?tab=overview            Tổng quan: số liệu, biểu đồ 14 ngày, dự án nhiều góp ý chờ, nhật ký gần đây
+//   ?tab=users&filter=…      Danh sách người dùng theo nhóm (đang hoạt động / bị khoá / quản trị / hỗ trợ / không hoạt động),
+//                            tìm, sắp xếp, phân trang, chọn nhiều để khoá – mở khoá, xuất CSV, thêm tài khoản
+//   ?tab=user&id=…           Trang chi tiết một người dùng: hồ sơ, dự án tham gia, góp ý gần đây, lịch sử quản trị, thao tác
+//   ?tab=projects&state=…    Mọi dự án (đang hoạt động / lưu trữ); mở để can thiệp, xoá (gõ lại tên)
+//   ?tab=log&action=…        Nhật ký quản trị, lọc theo loại thao tác
+// File này chỉ xử lý quyền, thao tác POST và chuẩn bị dữ liệu; phần HTML nằm ở templates/admin/*.php.
 require __DIR__ . '/../src/web.php';
 $c = db();
 $user = Auth::requireUser($c);
 AdminRepository::require($c, $user['id']);
 $admin = new AdminRepository($c);
-$tab = in_array(field($_GET, 'tab'), ['overview', 'users', 'projects', 'log'], true) ? field($_GET, 'tab') : 'overview';
+
+$tabs = ['overview', 'users', 'user', 'projects', 'log'];
+$tab = in_array(field($_GET, 'tab'), $tabs, true) ? field($_GET, 'tab') : 'overview';
 $q = field($_GET, 'q');
-$filter = field($_GET, 'filter');
+$filter = in_array(field($_GET, 'filter'), ['active', 'locked', 'admin', 'support', 'inactive'], true) ? field($_GET, 'filter') : '';
 $sort = field($_GET, 'sort');
-// Giữ nguyên tìm kiếm, lọc, sắp xếp và trang hiện tại sau mỗi thao tác.
-$back = '/admin.php?' . http_build_query(array_filter(['tab' => $tab, 'q' => $q, 'filter' => $filter, 'sort' => $sort,
-    'page' => intField($_GET, 'page'), 'per' => intField($_GET, 'per')], fn ($v) => $v !== '' && $v !== 0));
+$state = in_array(field($_GET, 'state'), ['active', 'archived'], true) ? field($_GET, 'state') : '';
+$action = field($_GET, 'action');
+$detailId = intField($_GET, 'id');
+// Giữ nguyên trang, bộ lọc, sắp xếp và số trang sau mỗi thao tác.
+$back = '/admin.php?' . http_build_query(array_filter(['tab' => $tab, 'id' => $detailId, 'q' => $q, 'filter' => $filter, 'sort' => $sort,
+    'state' => $state, 'page' => intField($_GET, 'page'), 'per' => intField($_GET, 'per')], fn ($v) => $v !== '' && $v !== 0));
+
 if (isPost()) {
     checkCsrf($_POST);
     $target = intField($_POST, 'target');
@@ -31,6 +42,17 @@ if (isPost()) {
                 $admin->setLocked($user['id'], $target, false);
                 flash('Đã mở khoá tài khoản.');
                 break;
+            case 'bulk_lock':
+            case 'bulk_unlock':
+                $ids = array_map('intval', (array) ($_POST['ids'] ?? []));
+                if ($ids === []) {
+                    flash('Lỗi: Chưa chọn người dùng nào.');
+                    break;
+                }
+                $n = $admin->bulkLock($user['id'], $ids, field($_POST, 'action') === 'bulk_lock', field($_POST, 'reason'));
+                flash((field($_POST, 'action') === 'bulk_lock' ? 'Đã khoá ' : 'Đã mở khoá ') . $n . ' tài khoản'
+                    . ($n < count($ids) ? ' (bỏ qua ' . (count($ids) - $n) . ' tài khoản của bạn hoặc đã ở trạng thái này).' : '.'));
+                break;
             case 'grant_admin':
             case 'revoke_admin':
             case 'grant_support':
@@ -40,8 +62,12 @@ if (isPost()) {
                 flash(($verb === 'grant' ? 'Đã cấp' : 'Đã bỏ') . ' quyền ' . ($role === 'admin' ? 'quản trị hệ thống.' : 'bộ phận hỗ trợ.'));
                 break;
             case 'reset_link':
-                $_SESSION['admin_link'] = ['user' => $target, 'link' => $admin->resetLink($user['id'], $target)];
+                $_SESSION['admin_link'] = ['user' => $target, 'link' => $admin->resetLink($user['id'], $target), 'title' => 'Link đặt lại mật khẩu'];
                 break;
+            case 'create_user':
+                $made = $admin->createUser($user['id'], field($_POST, 'name'), field($_POST, 'email'), field($_POST, 'title'), field($_POST, 'support') === '1');
+                $_SESSION['admin_link'] = ['user' => $made['id'], 'link' => $made['link'], 'title' => 'Đã tạo tài khoản — gửi link này để người dùng tự đặt mật khẩu'];
+                redirect('/admin.php?tab=user&id=' . $made['id']);
             case 'join':
                 $admin->joinProject($user['id'], $target);
                 flash('Bạn đã tham gia dự án với quyền Quản lý (đã ghi nhật ký quản trị).');
@@ -58,194 +84,74 @@ if (isPost()) {
     }
     redirect($back);
 }
+
+// Xuất danh sách người dùng đang lọc ra CSV (mở được bằng Excel, có BOM UTF-8 để giữ dấu tiếng Việt).
+if ($tab === 'users' && field($_GET, 'export') === 'csv') {
+    $rows = $admin->users($q, $filter, 100000, 0, $sort);
+    $admin->log($user['id'], 'EXPORT_USERS', $filter !== '' ? 'nhóm ' . $filter : 'tất cả', count($rows) . ' dòng');
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="pinpoint-nguoi-dung-' . date('Ymd') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['ID', 'Họ tên', 'Email', 'Chức danh', 'Quản trị', 'Hỗ trợ', 'Trạng thái', 'Dự án', 'Góp ý', 'Nhận xét', 'Đăng nhập gần nhất', 'Ngày tạo']);
+    foreach ($rows as $r) {
+        fputcsv($out, [$r['id'], $r['name'], $r['email'], $r['title'], $r['is_admin'] === 't' ? 'có' : '', $r['is_support'] === 't' ? 'có' : '',
+            $r['locked_at'] !== null ? 'Bị khoá' : 'Hoạt động', $r['projects'], $r['annotations'], $r['comments'],
+            $r['last_login_at'] ? date('d/m/Y H:i', (int) strtotime($r['last_login_at'])) : '', date('d/m/Y', (int) strtotime($r['created_at']))]);
+    }
+    exit;
+}
+
 $issued = $_SESSION['admin_link'] ?? null;
 unset($_SESSION['admin_link']);
 $stats = $admin->stats();
+$userCounts = $admin->userCounts();
+$projectCounts = $admin->projectCounts();
 $bytes = fn (int $b): string => $b >= 1048576 ? number_format($b / 1048576, 1, ',', '.') . ' MB' : number_format($b / 1024, 0, ',', '.') . ' KB';
-$title = 'Quản trị hệ thống';
+
+$userFilters = ['' => ['Tất cả người dùng', 'users', 'all'], 'active' => ['Đang hoạt động', 'check-circle', 'active'], 'locked' => ['Bị khoá', 'lock', 'locked'],
+    'admin' => ['Quản trị viên', 'shield', 'admin'], 'support' => ['Bộ phận hỗ trợ', 'inbox', 'support'], 'inactive' => ['Không đăng nhập 30 ngày', 'clock', 'inactive']];
+$pageTitles = ['overview' => 'Tổng quan', 'users' => $userFilters[$filter][0], 'user' => 'Chi tiết người dùng',
+    'projects' => $state === 'archived' ? 'Dự án đã lưu trữ' : ($state === 'active' ? 'Dự án đang hoạt động' : 'Tất cả dự án'), 'log' => 'Nhật ký quản trị'];
+
+// Dữ liệu riêng của từng trang
+$data = [];
+switch ($tab) {
+    case 'overview':
+        $data['daily'] = $admin->daily(14);
+        $data['topProjects'] = $admin->projects('', 5, 0, 'open');
+        $data['log'] = $admin->recentLog(8);
+        $data['newUsers'] = $admin->users('', '', 6, 0, 'new');
+        break;
+    case 'users':
+        $pg = Paginator::fromRequest($admin->countUsers($q, $filter), $_GET, 20);
+        $data['rows'] = $admin->users($q, $filter, $pg->perPage, $pg->offset(), $sort);
+        break;
+    case 'user':
+        try {
+            $data['u'] = $admin->userDetail($detailId);
+        } catch (AppError $ex) {
+            flash('Lỗi: Không tìm thấy người dùng này.');
+            redirect('/admin.php?tab=users');
+        }
+        $pageTitles['user'] = $data['u']['name'];
+        break;
+    case 'projects':
+        $pg = Paginator::fromRequest($admin->countProjects($q, $state), $_GET, 20);
+        $data['rows'] = $admin->projects($q, $pg->perPage, $pg->offset(), $sort, $state);
+        break;
+    case 'log':
+        $pg = Paginator::fromRequest($admin->countLog($action, $q), $_GET, 20);
+        $data['rows'] = $admin->recentLog($pg->perPage, $pg->offset(), $action, $q);
+        $data['actions'] = $admin->logActions();
+        break;
+}
+
+$title = 'Quản trị · ' . $pageTitles[$tab];
 $active = 'admin';
+$wide = true;
 require __DIR__ . '/../templates/header.php';
-?>
-<div class="page-head">
-<div>
-<h1><?= icon('shield') ?>Quản trị hệ thống</h1>
-<p><?= $stats['users']['total'] ?> người dùng · <?= $stats['projects']['projects'] ?> dự án · <?= $stats['annotations']['total'] ?> góp ý · dung lượng ảnh <?= e($bytes($stats['storage'])) ?></p>
-</div>
-<nav class="segmented" aria-label="Mục quản trị">
-<a href="/admin.php?tab=overview"<?= $tab === 'overview' ? ' aria-current="page"' : '' ?>><?= icon('chart', 'sm') ?>Tổng quan</a>
-<a href="/admin.php?tab=users"<?= $tab === 'users' ? ' aria-current="page"' : '' ?>><?= icon('users', 'sm') ?>Người dùng <span class="n"><?= $stats['users']['total'] ?></span></a>
-<a href="/admin.php?tab=projects"<?= $tab === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder', 'sm') ?>Dự án <span class="n"><?= $stats['projects']['projects'] ?></span></a>
-<a href="/admin.php?tab=log"<?= $tab === 'log' ? ' aria-current="page"' : '' ?>><?= icon('history', 'sm') ?>Nhật ký</a>
-<a href="/support_admin.php"><?= icon('inbox', 'sm') ?>Yêu cầu hỗ trợ <span class="n"><?= $stats['tickets']['open'] ?></span></a>
-</nav>
-</div>
-
-<?php if ($tab === 'overview'): ?>
-<?php $daily = $admin->daily(14); $max = max(1, ...array_map(fn ($d) => max($d['annotations'], $d['comments']), $daily)); ?>
-<div class="grid grid-4 admin-stats">
-<a class="stat" href="/admin.php?tab=users"><span class="stat-icon"><?= icon('users') ?></span><span><strong><?= $stats['users']['total'] ?></strong><span>Người dùng · <?= $stats['users']['new7'] ?> mới trong 7 ngày</span></span></a>
-<div class="stat"><span class="stat-icon ok"><?= icon('activity') ?></span><span><strong><?= $stats['users']['active7'] ?></strong><span>Đăng nhập trong 7 ngày</span></span></div>
-<a class="stat" href="/admin.php?tab=users&amp;filter=locked"><span class="stat-icon danger"><?= icon('lock') ?></span><span><strong><?= $stats['users']['locked'] ?></strong><span>Tài khoản bị khoá</span></span></a>
-<a class="stat" href="/admin.php?tab=projects"><span class="stat-icon warn"><?= icon('folder') ?></span><span><strong><?= $stats['projects']['projects'] ?></strong><span><?= $stats['projects']['screens'] ?> màn hình · <?= $stats['projects']['versions'] ?> phiên bản</span></span></a>
-<div class="stat"><span class="stat-icon pin"><?= icon('pin') ?></span><span><strong><?= $stats['annotations']['open'] ?></strong><span>Góp ý chưa xử lý · <?= $stats['annotations']['overdue'] ?> quá hạn</span></span></div>
-<div class="stat"><span class="stat-icon ok"><?= icon('check-circle') ?></span><span><strong><?= $stats['annotations']['resolved'] ?></strong><span>Góp ý đã xử lý</span></span></div>
-<div class="stat"><span class="stat-icon"><?= icon('chat') ?></span><span><strong><?= $stats['comments']['comments'] ?></strong><span>Nhận xét · <?= $stats['comments']['attachments'] ?> ảnh đính kèm</span></span></div>
-<a class="stat" href="/support_admin.php"><span class="stat-icon warn"><?= icon('inbox') ?></span><span><strong><?= $stats['tickets']['open'] ?></strong><span>Yêu cầu hỗ trợ đang chờ / <?= $stats['tickets']['total'] ?></span></span></a>
-</div>
-
-<div class="layout-side mt">
-<section class="card">
-<div class="section-title"><h2><?= icon('chart') ?>Hoạt động 14 ngày gần nhất</h2><span class="legend"><span class="dot a"></span>Góp ý mới <span class="dot r"></span>Trả lời</span></div>
-<svg class="bar-chart" viewBox="0 0 700 220" role="img" aria-label="Biểu đồ số góp ý mới và trả lời mỗi ngày">
-<?php foreach ($daily as $i => $d): $x = 20 + $i * 48; $ha = round($d['annotations'] / $max * 160); $hr = round($d['comments'] / $max * 160); ?>
-<g><title><?= e($d['day']) ?>: <?= $d['annotations'] ?> góp ý mới, <?= $d['comments'] ?> trả lời</title>
-<rect class="bar-a" x="<?= $x ?>" y="<?= 180 - $ha ?>" width="18" height="<?= max(1, $ha) ?>" rx="3"></rect>
-<rect class="bar-r" x="<?= $x + 20 ?>" y="<?= 180 - $hr ?>" width="18" height="<?= max(1, $hr) ?>" rx="3"></rect>
-<text x="<?= $x + 19 ?>" y="200" text-anchor="middle"><?= e($d['day']) ?></text>
-<?php if ($d['annotations'] + $d['comments'] > 0): ?><text class="bar-n" x="<?= $x + 19 ?>" y="<?= 172 - max($ha, $hr) ?>" text-anchor="middle"><?= $d['annotations'] + $d['comments'] ?></text><?php endif; ?>
-</g>
-<?php endforeach; ?>
-<line x1="12" y1="180" x2="690" y2="180" class="axis"></line>
-</svg>
-</section>
-<aside class="stack">
-<div class="card">
-<h2><?= icon('flag') ?>Dự án nhiều góp ý chưa xử lý</h2>
-<ul class="link-list">
-<?php $all = $admin->projects('', 5, 0, 'open'); ?>
-<?php foreach ($all as $p): ?>
-<li><?= icon('folder', 'sm') ?><span><strong><?= e($p['name']) ?></strong> · <?= (int) $p['open'] ?>/<?= (int) $p['annotations'] ?> chưa xử lý · <?= e($p['owner']) ?></span></li>
-<?php endforeach; ?>
-<?php if ($all === []): ?><li class="hint">Chưa có dự án nào.</li><?php endif; ?>
-</ul>
-</div>
-<div class="card">
-<div class="section-title"><h2><?= icon('history') ?>Nhật ký quản trị</h2><a class="hint" href="/admin.php?tab=log">Xem tất cả</a></div>
-<?php $log = $admin->recentLog(8); ?>
-<?php if ($log === []): ?><p class="hint">Chưa có thao tác quản trị nào.</p><?php endif; ?>
-<ul class="feed admin-log">
-<?php foreach ($log as $l): ?>
-<li><span class="feed-body"><strong><?= e($l['admin'] ?? '—') ?></strong> <span class="badge badge-muted"><?= e($l['action']) ?></span> <?= e($l['target']) ?><?= $l['detail'] !== '' ? ' · ' . e($l['detail']) : '' ?><time><?= e(ago($l['created_at'])) ?></time></span></li>
-<?php endforeach; ?>
-</ul>
-</div>
-</aside>
-</div>
-
-<?php elseif ($tab === 'users'): ?>
-<?php $pg = Paginator::fromRequest($admin->countUsers($q, $filter), $_GET, 20); $rows = $admin->users($q, $filter, $pg->perPage, $pg->offset(), $sort); ?>
-<?php if ($issued !== null): ?>
-<div class="card reset-box mb">
-<div class="flash warn" role="status"><?= icon('key') ?><span>Link đặt lại mật khẩu chỉ hiện <strong>một lần</strong>, hiệu lực <?= PasswordReset::TTL_MINUTES ?> phút. Copy và gửi cho người dùng qua kênh liên hệ an toàn.</span></div>
-<input class="issued-link" type="text" readonly value="<?= e($issued['link']) ?>" aria-label="Link đặt lại mật khẩu" data-select-all>
-</div>
-<?php endif; ?>
-<form method="get" action="/admin.php" class="filter-bar">
-<input type="hidden" name="tab" value="users">
-<div class="grow"><label for="aq">Tìm theo tên hoặc email</label><input id="aq" name="q" type="search" value="<?= e($q) ?>" placeholder="vd: trang, @pinpoint.test"></div>
-<div><label for="af">Lọc</label><select id="af" name="filter" data-autosubmit>
-<?php foreach (['' => 'Tất cả', 'locked' => 'Bị khoá', 'admin' => 'Quản trị viên', 'support' => 'Bộ phận hỗ trợ', 'inactive' => 'Không đăng nhập 30 ngày'] as $k => $label): ?><option value="<?= $k ?>"<?= $filter === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
-</select></div>
-<div><label for="as">Sắp xếp</label><select id="as" name="sort" data-autosubmit>
-<?php foreach (AdminRepository::USER_SORTS as $k => $label): ?><option value="<?= $k ?>"<?= ($sort ?: 'new') === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
-</select></div>
-<button class="btn" type="submit"><?= icon('search') ?>Tìm</button>
-</form>
-<div class="table-wrap">
-<table class="data admin-users" id="admin-users">
-<thead><tr><th>Người dùng</th><th>Vai trò hệ thống</th><th class="num">Dự án</th><th class="num">Góp ý</th><th class="num">Nhận xét</th><th>Đăng nhập gần nhất</th><th>Trạng thái</th><th></th></tr></thead>
-<tbody>
-<?php foreach ($rows as $u): $self = (int) $u['id'] === $user['id']; ?>
-<tr data-user="<?= e($u['email']) ?>"<?= $u['locked_at'] !== null ? ' class="is-locked"' : '' ?>>
-<td><div class="row center"><?= avatar($u['name'], (int) $u['id'], 'sm') ?><div><strong><?= e($u['name']) ?></strong><?= $self ? ' <span class="badge badge-muted">bạn</span>' : '' ?><div class="hint"><?= e($u['email']) ?> · tạo <?= e(date('d/m/Y', (int) strtotime($u['created_at']))) ?></div></div></div></td>
-<td><?= $u['is_admin'] === 't' ? '<span class="badge badge-role">Quản trị</span> ' : '' ?><?= $u['is_support'] === 't' ? '<span class="badge badge-resolved">Hỗ trợ</span>' : '' ?><?= $u['is_admin'] !== 't' && $u['is_support'] !== 't' ? '<span class="hint">Người dùng</span>' : '' ?></td>
-<td class="num"><?= (int) $u['projects'] ?></td><td class="num"><?= (int) $u['annotations'] ?></td><td class="num"><?= (int) $u['comments'] ?></td>
-<td><?= $u['last_login_at'] ? e(ago($u['last_login_at'])) : '<span class="hint">chưa</span>' ?></td>
-<td><?php if ($u['locked_at'] !== null): ?><span class="badge badge-open" title="<?= e($u['locked_reason']) ?>"><?= icon('lock', 'sm') ?>Bị khoá</span><?php if ($u['locked_reason'] !== ''): ?><div class="hint line-clamp-2"><?= e($u['locked_reason']) ?></div><?php endif; ?><?php else: ?><span class="badge badge-resolved">Hoạt động</span><?php endif; ?></td>
-<td class="nowrap">
-<details class="dropdown">
-<summary class="btn btn-sm btn-ghost" aria-label="Thao tác với <?= e($u['email']) ?>"><?= icon('settings', 'sm') ?>Thao tác</summary>
-<div class="menu menu-right admin-menu">
-<?php if (!$self): ?>
-<?php if ($u['locked_at'] === null): ?>
-<form method="post" action="<?= e($back) ?>" class="lock-form"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $u['id'] ?>"><input type="hidden" name="action" value="lock">
-<input name="reason" type="text" maxlength="300" placeholder="Lý do khoá (không bắt buộc)" aria-label="Lý do khoá">
-<button class="btn btn-sm btn-danger-solid" type="submit"><?= icon('lock', 'sm') ?>Khoá tài khoản</button></form>
-<?php else: ?>
-<form method="post" action="<?= e($back) ?>"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $u['id'] ?>"><input type="hidden" name="action" value="unlock"><button type="submit"><?= icon('unlock') ?>Mở khoá tài khoản</button></form>
-<?php endif; ?>
-<form method="post" action="<?= e($back) ?>"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $u['id'] ?>"><input type="hidden" name="action" value="<?= $u['is_admin'] === 't' ? 'revoke_admin' : 'grant_admin' ?>"><button type="submit"><?= icon('shield') ?><?= $u['is_admin'] === 't' ? 'Bỏ quyền quản trị' : 'Cấp quyền quản trị' ?></button></form>
-<?php endif; ?>
-<form method="post" action="<?= e($back) ?>"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $u['id'] ?>"><input type="hidden" name="action" value="<?= $u['is_support'] === 't' ? 'revoke_support' : 'grant_support' ?>"><button type="submit"><?= icon('inbox') ?><?= $u['is_support'] === 't' ? 'Bỏ quyền bộ phận hỗ trợ' : 'Cấp quyền bộ phận hỗ trợ' ?></button></form>
-<form method="post" action="<?= e($back) ?>"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $u['id'] ?>"><input type="hidden" name="action" value="reset_link"><button type="submit"><?= icon('key') ?>Cấp link đặt lại mật khẩu</button></form>
-</div>
-</details>
-</td>
-</tr>
-<?php endforeach; ?>
-<?php if ($rows === []): ?><tr><td colspan="8" class="hint">Không có người dùng phù hợp.</td></tr><?php endif; ?>
-</tbody>
-</table>
-</div>
-<?= $pg->render('/admin.php', ['tab' => 'users', 'q' => $q, 'filter' => $filter, 'sort' => $sort], 'người dùng') ?>
-
-<?php elseif ($tab === 'projects'): ?>
-<?php $pg = Paginator::fromRequest($admin->countProjects($q), $_GET, 20); $rows = $admin->projects($q, $pg->perPage, $pg->offset(), $sort); ?>
-<form method="get" action="/admin.php" class="filter-bar">
-<input type="hidden" name="tab" value="projects">
-<div class="grow"><label for="pq">Tìm theo tên dự án hoặc người tạo</label><input id="pq" name="q" type="search" value="<?= e($q) ?>"></div>
-<div><label for="ps">Sắp xếp</label><select id="ps" name="sort" data-autosubmit>
-<?php foreach (AdminRepository::PROJECT_SORTS as $k => $label): ?><option value="<?= $k ?>"<?= ($sort ?: 'new') === $k ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
-</select></div>
-<button class="btn" type="submit"><?= icon('search') ?>Tìm</button>
-</form>
-<div class="table-wrap">
-<table class="data" id="admin-projects">
-<thead><tr><th>Dự án</th><th>Người tạo</th><th class="num">Thành viên</th><th class="num">Màn hình</th><th class="num">Góp ý (chưa xử lý)</th><th class="num">Dung lượng</th><th>Hoạt động gần nhất</th><th></th></tr></thead>
-<tbody>
-<?php foreach ($rows as $p): ?>
-<tr data-project="<?= e($p['name']) ?>">
-<td><strong><?= e($p['name']) ?></strong><?= $p['archived_at'] !== null ? ' <span class="badge badge-muted">Lưu trữ</span>' : '' ?><div class="hint">#<?= (int) $p['id'] ?> · tạo <?= e(date('d/m/Y', (int) strtotime($p['created_at']))) ?></div></td>
-<td><?= e($p['owner']) ?><div class="hint"><?= e($p['owner_email']) ?></div></td>
-<td class="num"><?= (int) $p['members'] ?></td><td class="num"><?= (int) $p['screens'] ?></td>
-<td class="num"><?= (int) $p['annotations'] ?> <span class="hint">(<?= (int) $p['open'] ?>)</span></td>
-<td class="num"><?= e($bytes((int) $p['bytes'])) ?></td>
-<td><?= $p['last_activity'] ? e(ago($p['last_activity'])) : '<span class="hint">chưa có</span>' ?></td>
-<td class="nowrap">
-<form method="post" action="<?= e($back) ?>" class="inline"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $p['id'] ?>"><input type="hidden" name="action" value="join">
-<button class="btn btn-sm btn-ghost" type="submit" title="Tham gia với quyền Quản lý để xem và can thiệp (ghi nhật ký)"><?= icon('arrow-right', 'sm') ?>Mở / can thiệp</button></form>
-<details class="dropdown">
-<summary class="btn btn-sm btn-subtle" aria-label="Xoá dự án <?= e($p['name']) ?>"><?= icon('trash', 'sm') ?></summary>
-<div class="menu menu-right admin-menu">
-<form method="post" action="<?= e($back) ?>" class="lock-form"><?= csrfField() ?><input type="hidden" name="target" value="<?= (int) $p['id'] ?>"><input type="hidden" name="action" value="delete_project">
-<p class="hint">Xoá vĩnh viễn dự án, ảnh, góp ý. Gõ đúng tên <strong><?= e($p['name']) ?></strong>:</p>
-<input name="confirm_name" type="text" required aria-label="Gõ lại tên dự án" placeholder="<?= e($p['name']) ?>">
-<button class="btn btn-sm btn-danger-solid" type="submit"><?= icon('trash', 'sm') ?>Xoá dự án</button></form>
-</div>
-</details>
-</td>
-</tr>
-<?php endforeach; ?>
-<?php if ($rows === []): ?><tr><td colspan="8" class="hint">Không có dự án phù hợp.</td></tr><?php endif; ?>
-</tbody>
-</table>
-</div>
-<?= $pg->render('/admin.php', ['tab' => 'projects', 'q' => $q, 'sort' => $sort], 'dự án') ?>
-
-<?php else: ?>
-<?php $pg = Paginator::fromRequest($admin->countLog(), $_GET, 20); $log = $admin->recentLog($pg->perPage, $pg->offset()); ?>
-<div class="table-wrap">
-<table class="data" id="admin-log">
-<thead><tr><th>Thời điểm</th><th>Quản trị viên</th><th>Thao tác</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
-<tbody>
-<?php foreach ($log as $l): ?>
-<tr><td class="nowrap"><?= e(dateVi($l['created_at'])) ?><div class="hint"><?= e(ago($l['created_at'])) ?></div></td><td><?= e($l['admin'] ?? '—') ?></td>
-<td><span class="badge badge-role"><?= e($l['action']) ?></span></td><td><?= e($l['target']) ?></td><td class="hint"><?= e($l['detail']) ?></td></tr>
-<?php endforeach; ?>
-<?php if ($log === []): ?><tr><td colspan="5" class="hint">Chưa có thao tác quản trị nào.</td></tr><?php endif; ?>
-</tbody>
-</table>
-</div>
-<?= $pg->render('/admin.php', ['tab' => 'log'], 'thao tác') ?>
-<?php endif; ?>
-<?php require __DIR__ . '/../templates/footer.php'; ?>
+require __DIR__ . '/../templates/admin/layout.php';
+require __DIR__ . '/../templates/admin/' . $tab . '.php';
+require __DIR__ . '/../templates/admin/layout_end.php';
+require __DIR__ . '/../templates/footer.php';

@@ -88,6 +88,16 @@ final class Paginator
                 ? '<a class="pager-btn" rel="next" href="' . $url($this->page + 1) . '">Sau' . icon('chevron-right', 'sm') . '</a>'
                 : '<span class="pager-btn is-disabled" aria-disabled="true">Sau' . icon('chevron-right', 'sm') . '</span>';
             $html .= '</span>';
+            // Bản 2.6: ghi rõ đang ở trang mấy và cho nhảy thẳng tới một trang (giữ nguyên bộ lọc bằng các ô ẩn).
+            $html .= '<form class="pager-jump" method="get" action="' . e($path) . '"><span>Trang</span>';
+            foreach (array_filter($query, fn ($v) => $v !== '' && $v !== null && $v !== 0 && $v !== '0') as $k => $v) {
+                $html .= '<input type="hidden" name="' . e((string) $k) . '" value="' . e((string) $v) . '">';
+            }
+            if ($this->key === 'page') {
+                $html .= '<input type="hidden" name="per" value="' . $this->perPage . '">';
+            }
+            $html .= '<input type="number" name="' . e($this->key) . '" min="1" max="' . $this->pages . '" value="' . $this->page
+                . '" aria-label="Đến trang số"><span>/ ' . $this->pages . '</span><button type="submit" class="pager-btn">Đi</button></form>';
         }
         if ($sizes && $this->total > $this->sizes[0]) {
             $html .= '<span class="pager-size">';

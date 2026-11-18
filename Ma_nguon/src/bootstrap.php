@@ -24,6 +24,7 @@ require_once __DIR__ . '/AdminRepository.php';
 require_once __DIR__ . '/Export.php';
 require_once __DIR__ . '/Paginator.php';
 require_once __DIR__ . '/Seeder.php';
+require_once __DIR__ . '/DemoUsers.php';
 
 /** Thông báo tiếng Việt cho các mã lỗi nghiệp vụ. */
 function errorMessage(string $code): string
@@ -59,6 +60,7 @@ function errorMessage(string $code): string
         'LAST_VERSION' => 'Đây là phiên bản duy nhất. Hãy xoá cả màn hình nếu muốn bỏ ảnh này.',
         'OWNER_ONLY' => 'Chỉ người tạo dự án mới được xoá dự án.',
         'CONFIRM_MISMATCH' => 'Tên xác nhận không khớp. Chưa xoá gì.',
+        'EMAIL_TAKEN' => 'Email này đã có tài khoản.',
         'PASSWORD_WRONG' => 'Mật khẩu hiện tại không đúng.',
         'PASSWORD_MISMATCH' => 'Hai mật khẩu mới không khớp.',
         'TICKET_INVALID' => 'Hãy nhập tiêu đề (≤ 150 ký tự) và nội dung (≤ 4000 ký tự).',

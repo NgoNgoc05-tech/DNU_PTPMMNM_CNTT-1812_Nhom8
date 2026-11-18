@@ -29,6 +29,9 @@ $filtering = $f['q'] !== '' || $f['role'] !== '' || $f['state'] !== '';
 $annotations = new AnnotationRepository($c);
 $mine = $annotations->assignedTo($user['id'], 5);
 $myCountAll = $annotations->countAssigned($user['id']);
+$openAll = $annotations->countOpenInMyProjects($user['id']);
+$overdueMine = $annotations->countAssignedOverdue($user['id']);
+$dueSoon = $annotations->countAssignedDueSoon($user['id']);
 $invites = $repo->invitationsFor($user['id']);
 $hour = (int) date('G');
 $greet = $hour < 11 ? 'Chào buổi sáng' : ($hour < 14 ? 'Chào buổi trưa' : ($hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối'));
@@ -40,11 +43,23 @@ require __DIR__ . '/../templates/header.php';
 <div class="page-head">
 <div>
 <h1 class="greet"><?= e($greet) ?>, <?= e(end($firstName)) ?> <span class="greet-icon" aria-hidden="true"><?= icon('wave') ?></span></h1>
-<?php if ($invites !== []): ?><p class="summary-line"><a class="summary-pill invite" href="#invites"><?= icon('users', 'sm') ?><strong><?= count($invites) ?></strong> lời mời tham gia dự án đang chờ bạn trả lời</a></p><?php endif; ?>
+<p class="summary-line">
+<a class="summary-pill mine" href="/inbox.php" title="Góp ý chưa xử lý mà bạn là người phụ trách — cùng số với menu Việc giao cho bạn"><?= icon('inbox', 'sm') ?><strong><?= $myCountAll ?></strong> việc giao cho bạn</a>
+<span class="summary-sep" aria-hidden="true">/</span>
+<span class="summary-pill all" title="Mọi góp ý chưa xử lý trong các dự án đang hoạt động mà bạn tham gia, của tất cả người phụ trách"><?= icon('pin', 'sm') ?><strong><?= $openAll ?></strong> góp ý chờ xử lý trong toàn bộ dự án</span>
+<?php if ($invites !== []): ?><a class="summary-pill invite" href="#invites"><?= icon('users', 'sm') ?><strong><?= count($invites) ?></strong> lời mời đang chờ</a><?php endif; ?>
+</p>
 </div>
 <div class="actions"><button type="button" class="btn" data-open="dlg-new-project"><?= icon('plus') ?>Dự án mới</button></div>
 </div>
 <?php if ($error !== ''): ?><div class="flash error" role="alert"><?= icon('alert') ?><span><?= e($error) ?></span></div><?php endif; ?>
+<?php if ($dueSoon > 0 || $overdueMine > 0): ?>
+<div class="due-banner" role="status"><?= icon('bell') ?>
+<span><?php if ($dueSoon > 0): ?><strong><?= $dueSoon ?> việc</strong> giao cho bạn đến hạn trong 24 giờ tới<?php endif; ?><?= $dueSoon > 0 && $overdueMine > 0 ? ' · ' : '' ?><?php if ($overdueMine > 0): ?><strong><?= $overdueMine ?> việc đã quá hạn</strong><?php endif; ?>.
+<span class="hint">Pinpoint nhắc trong chuông thông báo và gửi email (nếu bật ở Hồ sơ) trước hạn 24 giờ.</span></span>
+<a class="btn btn-sm" href="/inbox.php">Xem ngay<?= icon('arrow-right', 'sm') ?></a>
+</div>
+<?php endif; ?>
 
 <?php if ($invites !== []): ?>
 <section class="invites" id="invites">
@@ -137,8 +152,8 @@ require __DIR__ . '/../templates/header.php';
 
 <aside class="stack">
 <div class="card">
-<div class="section-title"><h2><?= icon('inbox') ?>Việc của tôi <span class="count"><?= $myCountAll ?></span></h2><a class="hint" href="/inbox.php">Xem tất cả</a></div>
-<p class="hint mt-0">Góp ý chưa xử lý giao cho bạn phụ trách, gần hạn trước.</p>
+<div class="section-title"><h2><?= icon('inbox') ?>Việc giao cho bạn <span class="count"><?= $myCountAll ?></span></h2><a class="hint" href="/inbox.php">Xem tất cả</a></div>
+<p class="hint mt-0">Góp ý chưa xử lý mà bạn là người phụ trách, gần hạn trước. Đây chỉ là phần của bạn trong <?= $openAll ?> góp ý chờ của toàn bộ dự án.</p>
 <?php if ($mine === []): ?>
 <p class="hint empty-ok"><?= icon('check-circle', 'sm') ?>Không có góp ý nào đang chờ bạn xử lý.</p>
 <?php else: ?>

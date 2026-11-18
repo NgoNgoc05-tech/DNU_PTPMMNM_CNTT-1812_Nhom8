@@ -178,7 +178,10 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openCal) { var o = openCal.owner; closeCalendar(); o.input.focus(); } }, true);
   window.addEventListener('resize', closeCalendar);
-  document.addEventListener('scroll', function (e) { if (openCal && !openCal.pop.contains(e.target)) { closeCalendar(); } }, true);
+  // Cuộn trang thì đóng lịch — trừ 300 ms đầu sau khi mở: sự kiện cuộn đến trễ một nhịp (vd. vừa cuộn tới ô rồi bấm ngay) không được đóng lịch vừa mở.
+  document.addEventListener('scroll', function (e) {
+    if (openCal && !openCal.pop.contains(e.target) && Date.now() - openCal.openedAt > 300) { closeCalendar(); }
+  }, true);
 
   function isoOf(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
   function todayIso() { var t = new Date(); return isoOf(t.getFullYear(), t.getMonth(), t.getDate()); }
@@ -245,7 +248,8 @@
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
     owner.btn.setAttribute('aria-expanded', 'true');
     var sel = grid.querySelector('.is-selected') || grid.querySelector('.is-today') || grid.querySelector('.cal-day');
-    if (sel) { sel.focus(); }
+    if (sel) { sel.focus({ preventScroll: true }); }
+    api.openedAt = Date.now();
     openCal = api;
     return api;
   }
@@ -503,70 +507,55 @@
     return form;
   };
 
-  ThreadPanel.prototype.renderThread = function (a) {
+  /** Khối Trao đổi: các nhánh trả lời và ô soạn trả lời (có @nhắc tên). */
+  ThreadPanel.prototype.renderReplies = function (a, wrap) {
     var self = this;
     var cfg = this.opt.cfg;
-    var wrap = el('div', { class: 'thread', 'data-annotation': a.id });
-
-    // Đầu trang chi tiết: quay lại, số thứ tự, trước/sau
-    wrap.appendChild(el('div', { class: 'detail-head' }, [
-      el('button', { class: 'btn btn-subtle btn-sm', type: 'button', title: 'Về danh sách (Esc)', onclick: function () { self.opt.onSelect(null); } }, [icon('back'), 'Danh sách']),
-      el('span', { class: 'spacer' }),
-      el('span', { class: 'title' }, [el('span', { class: 'seq prio-' + a.priority + (a.status === 'RESOLVED' ? ' is-resolved' : ''), text: String(a.seq_no) }),
-        '#' + a.seq_no + ' · v' + a.version_no]),
-      el('span', { class: 'spacer' }),
-      el('button', { class: 'btn btn-subtle btn-icon btn-sm', type: 'button', title: 'Góp ý trước (←)', 'aria-label': 'Góp ý trước', onclick: function () { self.opt.onSelect(self.neighbour(-1)); } }, [icon('left')]),
-      el('button', { class: 'btn btn-subtle btn-icon btn-sm', type: 'button', title: 'Góp ý sau (→)', 'aria-label': 'Góp ý sau', onclick: function () { self.opt.onSelect(self.neighbour(1)); } }, [icon('right')])
-    ]));
-
-    // Nhận xét gốc
-    var rootBox = this.renderComment({ id: a.comment_id, body: a.body, author: a.author, author_id: a.comment_author_id,
-      lock_version: a.comment_lock, created_at: a.created_at, edited: a.comment_revisions > 0, reactions: a.reactions, attachments: a.attachments }, false);
-    wrap.appendChild(rootBox);
-
-    // Trạng thái (ghi nhận phiên bản đã kiểm tra)
-    if (cfg.canComment) {
-      var checked = this.opt.checkedVersion || { id: cfg.versionId, no: cfg.versionNo };
-      var to = a.status === 'OPEN' ? 'RESOLVED' : 'OPEN';
-      var note = el('input', { type: 'text', maxlength: '500', 'aria-label': 'Ghi chú khi đổi trạng thái',
-        placeholder: a.status === 'OPEN' ? 'Ghi chú kiểm tra (không bắt buộc)' : 'Lý do mở lại (không bắt buộc)' });
-      var sbtn = el('button', { class: 'btn status-toggle ' + (to === 'RESOLVED' ? 'is-open' : 'btn-danger'), type: 'submit', 'data-action': 'status' },
-        [icon(to === 'RESOLVED' ? 'check' : 'undo'), to === 'RESOLVED' ? 'Đánh dấu đã xử lý (kiểm tra trên v' + checked.no + ')' : 'Mở lại góp ý']);
-      wrap.appendChild(el('form', { class: 'status-box', onsubmit: function (e) {
-        e.preventDefault();
-        sbtn.disabled = true;
-        self.opt.api.post({ action: 'status', annotation_id: a.id, to: to, lock_version: a.lock_version, checked_version_id: checked.id, note: note.value })
-          .then(function () { toast(to === 'RESOLVED' ? 'Đã đánh dấu đã xử lý' : 'Đã mở lại'); self.opt.onChanged(a.id); })
-          .catch(function (err) {
-            sbtn.disabled = false;
-            if (err.code === 'CONFLICT') {
-              toast('Góp ý vừa được người khác thay đổi. Đã tải lại bản mới nhất.', true);
-              self.opt.onChanged(a.id);
-            } else { toast(err.message, true); }
-          });
-      } }, [sbtn, note, el('span', { class: 'hint', text: a.status === 'OPEN'
-        ? 'Sau khi sửa, hãy kiểm tra trên phiên bản mới rồi xác nhận. Phiên bản kiểm tra được ghi vào lịch sử.'
-        : 'Đã xử lý' + (a.resolved_on_version_no ? ' — kiểm tra trên v' + a.resolved_on_version_no : '') + '. Mở lại nếu bản mới vẫn chưa đạt.' })]));
-    }
-
-    // Thuộc tính
-    wrap.appendChild(el('div', { class: 'block-title' }, [icon('tag'), 'Thuộc tính']));
-    wrap.appendChild(this.renderProps(a));
-
-    // Ghi chú xử lý
-    wrap.appendChild(el('div', { class: 'block-title' }, [icon('note'), 'Ghi chú xử lý', el('span', { class: 'spacer' }),
-      el('span', { class: 'hint', text: 'thấy bởi mọi thành viên' })]));
-    wrap.appendChild(this.renderNote(a));
-
-    // Trao đổi
-    wrap.appendChild(el('div', { class: 'block-title' }, [icon('chat'), 'Trao đổi · ' + a.replies.length + ' trả lời']));
-    // Bản 2.4: trả lời theo luồng — mỗi trả lời có thể đáp lại một tin cụ thể (trích dẫn ngắn, bấm để nhảy tới tin gốc).
+    // Bản 2.6: trả lời lồng theo luồng — trả lời nhận xét gốc là một nhánh; trả lời cho một trả lời nằm thụt vào dưới nhánh đó.
     var byId = {};
-    byId[a.comment_id] = { id: a.comment_id, author: a.author, body: a.body };
+    byId[a.comment_id] = { id: a.comment_id, author: a.author, author_id: a.comment_author_id, body: a.body };
     a.replies.forEach(function (r) { byId[r.id] = r; });
-    if (a.replies.length) {
-      var reps = el('div', { class: 'replies thread-line' });
-      a.replies.forEach(function (r) { reps.appendChild(self.renderComment(r, true, byId[r.reply_to_id || a.comment_id] || null, r.reply_to_id === null)); });
+    var topOf = function (r) { // đi ngược lên tới trả lời cấp 1 (trả lời trực tiếp nhận xét gốc)
+      var cur = r; var guard = 0;
+      while (cur.reply_to_id && cur.reply_to_id !== a.comment_id && byId[cur.reply_to_id] && guard++ < 50) { cur = byId[cur.reply_to_id]; }
+      return cur;
+    };
+    var branches = []; var kids = {};
+    a.replies.forEach(function (r) {
+      var top = topOf(r);
+      if (top.id === r.id) { branches.push(r); kids[r.id] = kids[r.id] || []; } else { (kids[top.id] = kids[top.id] || []).push(r); }
+    });
+    var people = {};
+    a.replies.forEach(function (r) { people[r.author_id] = r.author; });
+    var head = el('div', { class: 'block-title thread-title' }, [icon('chat'), 'Trao đổi', el('span', { class: 'thread-n', text: String(a.replies.length) }),
+      el('span', { class: 'spacer' }),
+      el('span', { class: 'avatar-stack', title: Object.keys(people).length + ' người tham gia' }, Object.keys(people).slice(0, 4).map(function (id) { return avatar(people[id], +id, 'sm'); }))]);
+    wrap.appendChild(head);
+    if (!a.replies.length) {
+      wrap.appendChild(el('p', { class: 'thread-empty hint' }, [icon('chat'), 'Chưa có trao đổi. Gõ @ để nhắc tên người cần xem góp ý này.']));
+    } else {
+      var reps = el('div', { class: 'replies thread-tree' });
+      branches.forEach(function (r) {
+        var branch = el('div', { class: 'thread-branch' });
+        branch.appendChild(self.renderComment(r, true, byId[a.comment_id], true));
+        var list = kids[r.id] || [];
+        if (list.length) {
+          var box = el('div', { class: 'thread-children' });
+          list.forEach(function (k) { box.appendChild(self.renderComment(k, true, byId[k.reply_to_id] || r, false)); });
+          if (list.length > 2) { // nhánh dài: thu gọn, chỉ hiện trả lời mới nhất
+            box.classList.add('is-collapsed');
+            var more = el('button', { type: 'button', class: 'thread-more', 'aria-expanded': 'false' }, [icon('reply'), 'Xem thêm ' + (list.length - 1) + ' trả lời']);
+            more.addEventListener('click', function () {
+              var open = box.classList.toggle('is-collapsed') === false;
+              more.setAttribute('aria-expanded', String(open));
+              more.lastChild.textContent = open ? 'Thu gọn nhánh' : 'Xem thêm ' + (list.length - 1) + ' trả lời';
+            });
+            branch.appendChild(more);
+          }
+          branch.appendChild(box);
+        }
+        reps.appendChild(branch);
+      });
       wrap.appendChild(reps);
     }
     if (cfg.canComment) {
@@ -609,6 +598,66 @@
       } }, [quoteBar, rc.menu, rc.area, files.strip, el('div', { class: 'composer-foot' }, [files.button, files.input, el('span', { class: 'hint', text: 'Ctrl+Enter để gửi' }), btn])]);
       wrap.appendChild(replyForm);
     }
+  };
+
+  ThreadPanel.prototype.renderThread = function (a) {
+    var self = this;
+    var cfg = this.opt.cfg;
+    var wrap = el('div', { class: 'thread', 'data-annotation': a.id });
+
+    // Đầu trang chi tiết: quay lại, số thứ tự, trước/sau
+    wrap.appendChild(el('div', { class: 'detail-head' }, [
+      el('button', { class: 'btn btn-subtle btn-sm', type: 'button', title: 'Về danh sách (Esc)', onclick: function () { self.opt.onSelect(null); } }, [icon('back'), 'Danh sách']),
+      el('span', { class: 'spacer' }),
+      el('span', { class: 'title' }, [el('span', { class: 'seq prio-' + a.priority + (a.status === 'RESOLVED' ? ' is-resolved' : ''), text: String(a.seq_no) }),
+        '#' + a.seq_no + ' · v' + a.version_no]),
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-subtle btn-icon btn-sm', type: 'button', title: 'Góp ý trước (←)', 'aria-label': 'Góp ý trước', onclick: function () { self.opt.onSelect(self.neighbour(-1)); } }, [icon('left')]),
+      el('button', { class: 'btn btn-subtle btn-icon btn-sm', type: 'button', title: 'Góp ý sau (→)', 'aria-label': 'Góp ý sau', onclick: function () { self.opt.onSelect(self.neighbour(1)); } }, [icon('right')])
+    ]));
+
+    // Nhận xét gốc
+    var rootBox = this.renderComment({ id: a.comment_id, body: a.body, author: a.author, author_id: a.comment_author_id,
+      lock_version: a.comment_lock, created_at: a.created_at, edited: a.comment_revisions > 0, reactions: a.reactions, attachments: a.attachments }, false);
+    wrap.appendChild(rootBox);
+
+    // Trao đổi ngay dưới nhận xét gốc để đọc liền mạch (trước đây nằm sau Thuộc tính và Ghi chú, phải cuộn mới thấy)
+    this.renderReplies(a, wrap);
+
+    // Trạng thái (ghi nhận phiên bản đã kiểm tra)
+    if (cfg.canComment) {
+      var checked = this.opt.checkedVersion || { id: cfg.versionId, no: cfg.versionNo };
+      var to = a.status === 'OPEN' ? 'RESOLVED' : 'OPEN';
+      var note = el('input', { type: 'text', maxlength: '500', 'aria-label': 'Ghi chú khi đổi trạng thái',
+        placeholder: a.status === 'OPEN' ? 'Ghi chú kiểm tra (không bắt buộc)' : 'Lý do mở lại (không bắt buộc)' });
+      var sbtn = el('button', { class: 'btn status-toggle ' + (to === 'RESOLVED' ? 'is-open' : 'btn-danger'), type: 'submit', 'data-action': 'status' },
+        [icon(to === 'RESOLVED' ? 'check' : 'undo'), to === 'RESOLVED' ? 'Đánh dấu đã xử lý (kiểm tra trên v' + checked.no + ')' : 'Mở lại góp ý']);
+      wrap.appendChild(el('form', { class: 'status-box', onsubmit: function (e) {
+        e.preventDefault();
+        sbtn.disabled = true;
+        self.opt.api.post({ action: 'status', annotation_id: a.id, to: to, lock_version: a.lock_version, checked_version_id: checked.id, note: note.value })
+          .then(function () { toast(to === 'RESOLVED' ? 'Đã đánh dấu đã xử lý' : 'Đã mở lại'); self.opt.onChanged(a.id); })
+          .catch(function (err) {
+            sbtn.disabled = false;
+            if (err.code === 'CONFLICT') {
+              toast('Góp ý vừa được người khác thay đổi. Đã tải lại bản mới nhất.', true);
+              self.opt.onChanged(a.id);
+            } else { toast(err.message, true); }
+          });
+      } }, [sbtn, note, el('span', { class: 'hint', text: a.status === 'OPEN'
+        ? 'Sau khi sửa, hãy kiểm tra trên phiên bản mới rồi xác nhận. Phiên bản kiểm tra được ghi vào lịch sử.'
+        : 'Đã xử lý' + (a.resolved_on_version_no ? ' — kiểm tra trên v' + a.resolved_on_version_no : '') + '. Mở lại nếu bản mới vẫn chưa đạt.' })]));
+    }
+
+    // Thuộc tính
+    wrap.appendChild(el('div', { class: 'block-title' }, [icon('tag'), 'Thuộc tính']));
+    wrap.appendChild(this.renderProps(a));
+
+    // Ghi chú xử lý
+    wrap.appendChild(el('div', { class: 'block-title' }, [icon('note'), 'Ghi chú xử lý', el('span', { class: 'spacer' }),
+      el('span', { class: 'hint', text: 'thấy bởi mọi thành viên' })]));
+    wrap.appendChild(this.renderNote(a));
+
 
     // Lịch sử
     wrap.appendChild(el('div', { class: 'block-title' }, [icon('history'), 'Lịch sử']));

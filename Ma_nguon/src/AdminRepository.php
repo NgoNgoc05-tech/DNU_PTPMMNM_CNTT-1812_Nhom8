@@ -69,6 +69,7 @@ final class AdminRepository
         }
         $where[] = match ($filter) {
             'locked' => 'u.locked_at IS NOT NULL',
+            'active' => 'u.locked_at IS NULL',
             'admin' => 'u.is_admin',
             'support' => 'u.is_support',
             'inactive' => "(u.last_login_at IS NULL OR u.last_login_at < now() - interval '30 days')",
@@ -104,25 +105,28 @@ final class AdminRepository
                FROM users u WHERE $where ORDER BY $order LIMIT \$" . ($n - 1) . " OFFSET \$$n", $params);
     }
 
-    public function countProjects(string $q = ''): int
+    public function countProjects(string $q = '', string $state = ''): int
     {
-        [$where, $params] = $this->projectWhere($q);
+        [$where, $params] = $this->projectWhere($q, $state);
         return (int) fetchOne($this->c, "SELECT COUNT(*) AS n FROM projects p JOIN users o ON o.id = p.created_by WHERE $where", $params)['n'];
     }
 
     /** @return array{0:string,1:array} */
-    private function projectWhere(string $q): array
+    private function projectWhere(string $q, string $state = ''): array
     {
-        if (trim($q) === '') {
-            return ['TRUE', []];
+        $where = [match ($state) { 'active' => 'p.archived_at IS NULL', 'archived' => 'p.archived_at IS NOT NULL', default => 'TRUE' }];
+        $params = [];
+        if (trim($q) !== '') {
+            $where[] = '(p.name ILIKE $1 OR o.email ILIKE $1 OR o.name ILIKE $1)';
+            $params[] = '%' . addcslashes(mb_substr(trim($q), 0, 100), '%_\\') . '%';
         }
-        return ['(p.name ILIKE $1 OR o.email ILIKE $1 OR o.name ILIKE $1)', ['%' . addcslashes(mb_substr(trim($q), 0, 100), '%_\\') . '%']];
+        return [implode(' AND ', $where), $params];
     }
 
     /** Một trang dự án toàn hệ thống; số liệu gom một lần cho mỗi dự án bằng LATERAL. */
-    public function projects(string $q = '', int $limit = 20, int $offset = 0, string $sort = 'new'): array
+    public function projects(string $q = '', int $limit = 20, int $offset = 0, string $sort = 'new', string $state = ''): array
     {
-        [$where, $params] = $this->projectWhere($q);
+        [$where, $params] = $this->projectWhere($q, $state);
         $order = match ($sort) {
             'open' => 'st.open DESC, p.id DESC',
             'size' => 'sz.bytes DESC, p.id DESC',
@@ -210,16 +214,127 @@ final class AdminRepository
             [$adminId, $action, mb_substr($target, 0, 200), mb_substr($detail, 0, 300)]);
     }
 
-    public function recentLog(int $limit = 30, int $offset = 0): array
+    /** @return array{0:string,1:array} lọc nhật ký theo loại thao tác và từ khoá (đối tượng / chi tiết). */
+    private function logWhere(string $action, string $q): array
     {
-        return fetchAll($this->c,
-            'SELECT l.action, l.target, l.detail, l.created_at, u.name AS admin FROM admin_log l LEFT JOIN users u ON u.id = l.admin_id
-              ORDER BY l.id DESC LIMIT $1 OFFSET $2', [$limit, $offset]);
+        $where = ['TRUE'];
+        $params = [];
+        if ($action !== '') {
+            $params[] = $action;
+            $where[] = 'l.action = $' . count($params);
+        }
+        if (trim($q) !== '') {
+            $params[] = '%' . addcslashes(mb_substr(trim($q), 0, 100), '%_\\') . '%';
+            $where[] = '(l.target ILIKE $' . count($params) . ' OR l.detail ILIKE $' . count($params) . ')';
+        }
+        return [implode(' AND ', $where), $params];
     }
 
-    public function countLog(): int
+    public function recentLog(int $limit = 30, int $offset = 0, string $action = '', string $q = ''): array
     {
-        return (int) fetchOne($this->c, 'SELECT COUNT(*) AS n FROM admin_log')['n'];
+        [$where, $params] = $this->logWhere($action, $q);
+        $params[] = $limit;
+        $params[] = $offset;
+        $n = count($params);
+        return fetchAll($this->c,
+            "SELECT l.action, l.target, l.detail, l.created_at, u.name AS admin FROM admin_log l LEFT JOIN users u ON u.id = l.admin_id
+              WHERE $where ORDER BY l.id DESC LIMIT \$" . ($n - 1) . " OFFSET \$$n", $params);
+    }
+
+    public function countLog(string $action = '', string $q = ''): int
+    {
+        [$where, $params] = $this->logWhere($action, $q);
+        return (int) fetchOne($this->c, "SELECT COUNT(*) AS n FROM admin_log l WHERE $where", $params)['n'];
+    }
+
+    /** Các loại thao tác đã có trong nhật ký (cho ô lọc). @return string[] */
+    public function logActions(): array
+    {
+        return array_column(fetchAll($this->c, 'SELECT DISTINCT action FROM admin_log ORDER BY action'), 'action');
+    }
+
+    /* ----------------------------------------------------------------------------------------------------------
+     * Bản 2.6 — trang quản trị chia thành nhiều trang con (giống bảng điều khiển của các ứng dụng lớn):
+     * đếm theo từng nhóm cho thanh bên, thao tác hàng loạt, tạo tài khoản, trang chi tiết một người dùng.
+     * ---------------------------------------------------------------------------------------------------------- */
+
+    /** Số người dùng theo từng nhóm lọc — hiện cạnh mỗi mục ở thanh bên và trên các nút lọc. */
+    public function userCounts(): array
+    {
+        return array_map('intval', fetchOne($this->c,
+            "SELECT COUNT(*) AS all, COUNT(*) FILTER (WHERE locked_at IS NULL) AS active, COUNT(*) FILTER (WHERE locked_at IS NOT NULL) AS locked,
+                    COUNT(*) FILTER (WHERE is_admin) AS admin, COUNT(*) FILTER (WHERE is_support) AS support,
+                    COUNT(*) FILTER (WHERE last_login_at IS NULL OR last_login_at < now() - interval '30 days') AS inactive FROM users") ?? []);
+    }
+
+    public function projectCounts(): array
+    {
+        return array_map('intval', fetchOne($this->c,
+            'SELECT COUNT(*) AS all, COUNT(*) FILTER (WHERE archived_at IS NULL) AS active, COUNT(*) FILTER (WHERE archived_at IS NOT NULL) AS archived FROM projects') ?? []);
+    }
+
+    /**
+     * Khoá / mở khoá nhiều tài khoản một lần. Bỏ qua chính mình và tài khoản đã ở đúng trạng thái.
+     * @param int[] $userIds
+     * @return int số tài khoản thực sự thay đổi
+     */
+    public function bulkLock(int $adminId, array $userIds, bool $locked, string $reason = ''): int
+    {
+        $done = 0;
+        foreach (array_unique(array_filter(array_map('intval', $userIds), fn ($id) => $id > 0 && $id !== $adminId)) as $id) {
+            $row = fetchOne($this->c, 'SELECT locked_at FROM users WHERE id = $1', [$id]);
+            if ($row === null || ($row['locked_at'] !== null) === $locked) {
+                continue;
+            }
+            $this->setLocked($adminId, $id, $locked, $reason);
+            $done++;
+        }
+        return $done;
+    }
+
+    /**
+     * Quản trị viên tạo tài khoản cho người khác. Mật khẩu là chuỗi ngẫu nhiên không ai biết;
+     * người dùng đặt mật khẩu của mình qua link đặt lại (hiện cho quản trị viên một lần, hết hạn sau 30 phút).
+     * @return array{id:int,link:string}
+     */
+    public function createUser(int $adminId, string $name, string $email, string $title = '', bool $support = false): array
+    {
+        $email = strtolower(trim($email));
+        if (trim($name) === '' || mb_strlen(trim($name)) > 120) {
+            throw new AppError('NAME_INVALID', 422);
+        }
+        if (fetchOne($this->c, 'SELECT 1 FROM users WHERE email = $1', [$email]) !== null) {
+            throw new AppError('EMAIL_TAKEN', 422);
+        }
+        $id = Auth::createUser($this->c, $email, $name, bin2hex(random_bytes(16)));
+        queryParams($this->c, 'UPDATE users SET title = $2, is_support = $3 WHERE id = $1', [$id, mb_substr(trim($title), 0, 120), $support ? 't' : 'f']);
+        $link = PasswordReset::link(PasswordReset::issue($this->c, $id, $adminId));
+        $this->log($adminId, 'CREATE_USER', $email, $support ? 'kèm quyền bộ phận hỗ trợ' : '');
+        return ['id' => $id, 'link' => $link];
+    }
+
+    /** Hồ sơ đầy đủ một người dùng cho trang chi tiết. */
+    public function userDetail(int $userId): array
+    {
+        $u = fetchOne($this->c,
+            "SELECT u.id, u.email, u.name, u.title, u.created_at, u.last_login_at, u.is_admin, u.is_support, u.locked_at, u.locked_reason, u.email_reminders,
+                    (SELECT COUNT(*) FROM project_members pm WHERE pm.user_id = u.id) AS projects,
+                    (SELECT COUNT(*) FROM annotations a WHERE a.created_by = u.id) AS annotations,
+                    (SELECT COUNT(*) FROM annotations a WHERE a.assignee_id = u.id AND a.status = 'OPEN') AS assigned_open,
+                    (SELECT COUNT(*) FROM comments c WHERE c.author_id = u.id) AS comments
+               FROM users u WHERE u.id = $1", [$userId]) ?? throw new AppError('NOT_FOUND', 404);
+        $u['project_list'] = fetchAll($this->c,
+            "SELECT p.id, p.name, p.archived_at, pm.role, pm.created_at AS joined_at, (p.created_by = pm.user_id) AS owner
+               FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE pm.user_id = $1 ORDER BY pm.created_at DESC LIMIT 50", [$userId]);
+        $u['recent'] = fetchAll($this->c,
+            "SELECT a.id, a.seq_no, a.status, a.created_at, s.id AS screen_id, s.name AS screen_name, v.id AS version_id, v.version_no, p.name AS project_name, rc.body
+               FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id JOIN projects p ON p.id = s.project_id
+               JOIN comments rc ON rc.annotation_id = a.id AND rc.parent_id IS NULL
+              WHERE a.created_by = $1 ORDER BY a.id DESC LIMIT 8", [$userId]);
+        $u['log'] = fetchAll($this->c,
+            'SELECT l.action, l.detail, l.created_at, a.name AS admin FROM admin_log l LEFT JOIN users a ON a.id = l.admin_id
+              WHERE l.target = $1 ORDER BY l.id DESC LIMIT 10', [$u['email']]);
+        return $u;
     }
 
     private function user(int $userId): array

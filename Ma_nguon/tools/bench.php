@@ -29,8 +29,8 @@ printf("Dữ liệu: %d người dùng · %d dự án · %d góp ý · %d nhận
 $cases = [
     'Trang Dự án: đếm + 1 trang (9 dự án), sắp theo hoạt động' => fn () => [$projects->countForUser($uid, []), $projects->pageForUser($uid, [], 9, 0)],
     'Trang Dự án: tìm "app" + lọc còn góp ý chờ' => fn () => $projects->pageForUser($uid, ['q' => 'app', 'state' => 'open', 'sort' => 'open'], 9, 0),
-    'Menu "Việc của tôi" (đếm)' => fn () => $ann->countAssigned($uid),
-    'Trang Việc của tôi (20 dòng)' => fn () => $ann->assignedTo($uid, 20, 0),
+    'Menu "Việc giao cho bạn" (đếm)' => fn () => $ann->countAssigned($uid),
+    'Trang Việc giao cho bạn (20 dòng)' => fn () => $ann->assignedTo($uid, 20, 0),
     'Trình xem: góp ý + trao đổi của 1 phiên bản' => fn () => $ann->listForVersion($vid, "", 0, $uid),
     'Tìm góp ý: đếm + trang 25 dòng, ưu tiên cao trước' => fn () => [$ann->countSearch($pid, 'OPEN'), $ann->search($pid, 'OPEN', 0, '', 0, ['sort' => 'priority', 'limit' => 25, 'offset' => 0])],
     'Tìm góp ý theo nội dung "nút"' => fn () => $ann->search($pid, '', 0, 'nút', 0, ['limit' => 25, 'offset' => 0]),

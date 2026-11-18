@@ -153,6 +153,24 @@
   // In / lưu PDF danh sách góp ý.
   document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
 
+  // Bản 2.6 — quản trị: chọn nhiều người dùng; thanh thao tác hàng loạt chỉ hiện khi có ít nhất một dòng được chọn.
+  var bulk = document.querySelector('[data-bulk]');
+  if (bulk) {
+    var items = function () { return Array.prototype.slice.call(document.querySelectorAll('[data-bulk-item]')); };
+    var all = document.querySelector('[data-bulk-all]');
+    var sync = function () {
+      var picked = items().filter(function (x) { return x.checked; });
+      bulk.hidden = picked.length === 0;
+      bulk.querySelector('[data-bulk-count]').textContent = String(picked.length);
+      items().forEach(function (x) { x.closest('tr').classList.toggle('is-picked', x.checked); });
+      if (all) { all.checked = picked.length > 0 && picked.length === items().length; all.indeterminate = picked.length > 0 && picked.length < items().length; }
+    };
+    document.addEventListener('change', function (e) { if (e.target.matches('[data-bulk-item]')) { sync(); } });
+    if (all) { all.addEventListener('change', function () { items().forEach(function (x) { x.checked = all.checked; }); sync(); }); }
+    bulk.querySelector('[data-bulk-clear]').addEventListener('click', function () { items().forEach(function (x) { x.checked = false; }); sync(); });
+    sync();
+  }
+
   // Thông báo flash trên các trang toàn màn hình.
   var f = document.querySelector('[data-flash]');
   if (f) { toast(f.dataset.flash, f.dataset.flashError === '1'); }

@@ -177,7 +177,7 @@
   if (suggest) { suggest.addEventListener('click', function (e) { var b = e.target.closest('button[data-ask]'); if (b) { ask(b.dataset.ask); } }); }
   restore();
 
-  // Nút nổi mở/đóng khung chat
+  // Nút trợ lý trên thanh trên cùng mở/đóng khung chat (bấm ra ngoài hoặc Esc để đóng)
   var open = document.getElementById('chat-open');
   var panel = document.getElementById('chat-panel');
   if (open && panel) {
@@ -189,5 +189,8 @@
     open.addEventListener('click', function () { toggle(panel.hidden); });
     document.getElementById('chat-close').addEventListener('click', function () { toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { toggle(false); } });
+    document.addEventListener('click', function (e) {
+      if (!panel.hidden && !panel.contains(e.target) && !open.contains(e.target)) { toggle(false); }
+    });
   }
 })();

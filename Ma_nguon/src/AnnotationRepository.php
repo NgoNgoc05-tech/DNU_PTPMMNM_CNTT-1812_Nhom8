@@ -365,8 +365,8 @@ final class AnnotationRepository
 
     /** Góp ý chưa xử lý được giao cho một người (trong các dự án họ còn là thành viên). */
     /**
-     * “Việc của tôi” = góp ý CHƯA XỬ LÝ mà mình là NGƯỜI PHỤ TRÁCH, trong dự án đang hoạt động (không tính dự án lưu trữ).
-     * Dùng chung cho số trên menu, trang Dự án và trang Việc của tôi để con số luôn khớp nhau.
+     * “Việc giao cho bạn” = góp ý CHƯA XỬ LÝ mà mình là NGƯỜI PHỤ TRÁCH, trong dự án đang hoạt động (không tính dự án lưu trữ).
+     * Dùng chung cho số trên menu, trang Dự án và trang Việc giao cho bạn để con số luôn khớp nhau.
      */
     public function countAssigned(int $userId): int
     {
@@ -376,13 +376,35 @@ final class AnnotationRepository
               WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL", [$userId])['n'];
     }
 
-    /** Số góp ý quá hạn trong "Việc của tôi". */
+    /** Số góp ý quá hạn trong "Việc giao cho bạn". */
     public function countAssignedOverdue(int $userId): int
     {
         return (int) fetchOne($this->c,
             "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
                JOIN projects p ON p.id = s.project_id JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
               WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL AND a.due_date < CURRENT_DATE", [$userId])['n'];
+    }
+
+    /**
+     * Bản 2.6: số góp ý CHƯA XỬ LÝ trong toàn bộ dự án (đang hoạt động) mà người này là thành viên — của mọi người phụ trách.
+     * Khác "Việc giao cho bạn" (chỉ góp ý mình phụ trách); trang Dự án hiện cả hai số cạnh nhau để không bị nhầm.
+     */
+    public function countOpenInMyProjects(int $userId): int
+    {
+        return (int) fetchOne($this->c,
+            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+               JOIN projects p ON p.id = s.project_id JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+              WHERE a.status = 'OPEN' AND p.archived_at IS NULL", [$userId])['n'];
+    }
+
+    /** Bản 2.6: việc giao cho bạn có hạn hôm nay hoặc ngày mai (trong vòng 24 giờ tới) — hiện thành dải nhắc ở đầu trang. */
+    public function countAssignedDueSoon(int $userId): int
+    {
+        return (int) fetchOne($this->c,
+            "SELECT COUNT(*) AS n FROM annotations a JOIN image_versions v ON v.id = a.image_version_id JOIN screens s ON s.id = v.screen_id
+               JOIN projects p ON p.id = s.project_id JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+              WHERE a.assignee_id = $1 AND a.status = 'OPEN' AND p.archived_at IS NULL
+                AND a.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 1", [$userId])['n'];
     }
 
     public function assignedTo(int $userId, int $limit = 20, int $offset = 0): array

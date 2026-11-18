@@ -161,7 +161,7 @@ try {
         'project_id' => $fx['projects']['A'], 'name' => 'Đổi trộm', 'description' => '']), ['Content-Type: application/x-www-form-urlencoded']);
     same($st, 403, 'http-reviewer-cannot-rename-project');
     [$st, , $html] = $designer->request('GET', '/inbox.php');
-    same([$st, str_contains($html, 'Việc của tôi')], [200, true], 'http-inbox-page');
+    same([$st, str_contains($html, 'Việc giao cho bạn')], [200, true], 'http-inbox-page');
 
     echo "-- Bản 2.1: xoá, thông báo, trợ lý ảo, hỗ trợ qua HTTP\n";
     $form = ['Content-Type: application/x-www-form-urlencoded'];

@@ -121,6 +121,8 @@ same(Paginator::fromRequest(100, ['page' => '2', 'per' => '999'], 20)->perPage, 
 $html = (new Paginator(135, 2, 20))->render('/issues.php', ['project' => 3, 'q' => '<b>', 'status' => ''], 'góp ý');
 same([str_contains($html, 'Hiển thị <strong>21–40</strong> trên <strong>135</strong> góp ý'), str_contains($html, 'q=%3Cb%3E'),
     str_contains($html, '<b>'), str_contains($html, 'status=')], [true, true, false, false], 'v25-pager-render-escaped-keeps-filters');
+same([str_contains($html, 'class="pager-jump"'), str_contains($html, 'name="project" value="3"'), str_contains($html, 'max="7" value="2"'),
+    str_contains($html, '<span>/ 7</span>')], [true, true, true, true], 'v26-pager-jump-to-page');
 same(str_contains((new Paginator(40, 1, 15, [15], 'apage'))->render('/x.php', ['page' => 2], 'hoạt động', true, '#activity'), 'page=2&amp;apage=2#activity'), true, 'v25-pager-second-list-own-key');
 
 // Giao diện chỉ dùng icon SVG, không dùng emoji (emoji hiển thị khác nhau giữa Windows, macOS, Android).
@@ -157,5 +159,12 @@ throwsCode(fn () => ImageStore::path('../../etc/passwd'), 'NOT_FOUND', 'stored-n
 throwsCode(fn () => ImageStore::fromUpload(['name' => 'a.png', 'tmp_name' => "$tmp/ok.png", 'size' => 100, 'error' => UPLOAD_ERR_OK]), 'IMAGE_MISSING', 'non-uploaded-path-rejected');
 array_map('unlink', glob("$tmp/*"));
 rmdir($tmp);
+
+echo "-- Bản 2.6: người dùng ảo\n";
+$demo = DemoUsers::generate(100);
+same([count($demo), count(array_unique(array_column($demo, 'email')))], [100, 100], 'v26-demo-users-100-unique-emails');
+same($demo, DemoUsers::generate(100), 'v26-demo-users-deterministic');
+same(DemoUsers::slug('Đặng Quỳnh Hữu'), 'dang.quynh.huu', 'v26-slug-strips-vietnamese-marks');
+same(count(array_filter($demo, fn ($u) => !str_ends_with($u['email'], '@' . DemoUsers::DOMAIN))), 0, 'v26-demo-users-own-domain');
 
 finish();

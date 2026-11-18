@@ -43,6 +43,9 @@ try {
     echo "Đăng nhập: designer@pinpoint.test / reviewer@pinpoint.test / viewer@pinpoint.test — mật khẩu Pinpoint@123\n";
     echo "Bộ phận hỗ trợ: hotro@pinpoint.test / Pinpoint@123 (trang /support_admin.php)\n";
     echo "Quản trị hệ thống: admin@pinpoint.test / Pinpoint@123 (trang /admin.php)\n";
+    // Bản 2.6: thêm 100 người dùng ảo để trang quản trị có đủ dữ liệu (phân trang, lọc, khoá hàng loạt).
+    $d = DemoUsers::run($c, 100);
+    echo "NGUOI_DUNG_AO=OK | {$d['created']} tài khoản @" . DemoUsers::DOMAIN . " ({$d['locked']} bị khoá) — chạy lại: bash lab.sh seed-users\n";
 } catch (Throwable $e) {
     fwrite(STDERR, 'SETUP_FAILED: ' . $e->getMessage() . "\n");
     exit(2);

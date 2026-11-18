@@ -9,6 +9,37 @@
 - Phân trang trang Tìm góp ý khi dự án có hàng nghìn góp ý.
 - Thông báo thời gian thực khi có trả lời mới.
 
+## [2.6.0] - 2026-11-18
+
+Sửa theo nhận xét của giảng viên sau buổi duyệt bản 2.5.
+
+### Thay đổi
+- **Bảng màu mới** lấy từ ảnh tham khảo: xanh `#0297DE` (màu chính), trắng `#FFFFFF` (nền), hồng `#D83995` (điểm nhấn cho thứ cần chú ý:
+  góp ý chưa xử lý, số đếm, nút trợ lý, nhắc hạn). Áp cho logo, favicon, ghim góp ý, tiêu đề bảng, thanh tiến độ, giao diện tối.
+- **Mục đang chọn luôn có màu**: menu chính, thanh bên quản trị, nút lọc, số trang hiện tại đều tô nền xanh đặc, chữ trắng.
+- **Thống nhất tên “Việc giao cho bạn”** ở menu, bảng bên phải trang Dự án và trang danh sách (trước là “Việc của tôi” / “Việc giao cho tôi”).
+  Dòng chào ghi rõ hai con số khác nhau: “9 việc giao cho bạn / 13 góp ý chờ xử lý trong toàn bộ dự án”, rê chuột để xem giải thích.
+- **Nút trợ lý ảo chuyển lên thanh trên cùng** (icon tròn cạnh chuông thông báo), bảng chat thả xuống ngay dưới;
+  không còn nút nổi đè lên nội dung bảng bên phải. Bấm ra ngoài hoặc Esc để đóng.
+- **Trao đổi trong góp ý** nằm ngay dưới nhận xét gốc (trước phải cuộn qua Thuộc tính và Ghi chú). Trả lời cho một trả lời được lồng thụt vào dưới nhánh
+  của nó, có đường nối; nhánh dài hơn 2 trả lời tự thu gọn (“Xem thêm N trả lời”). @tên hiện thành nhãn màu, tên của chính mình tô hồng.
+- **Phân trang** có thêm “Trang [ 7 ] / 11 — Đi” để nhảy thẳng tới một trang, viền màu và số trang hiện tại nổi bật.
+- **Trang quản trị chia thành nhiều trang con** với thanh bên trái như các bảng điều khiển lớn: Tổng quan · Người dùng (tất cả / đang hoạt động /
+  bị khoá / quản trị viên / bộ phận hỗ trợ / không đăng nhập 30 ngày, kèm số) · Dự án (tất cả / đang hoạt động / lưu trữ) · Nhật ký · Yêu cầu hỗ trợ.
+  Phần HTML tách ra `templates/admin/`, `public/admin.php` chỉ còn xử lý quyền, thao tác và dữ liệu.
+
+### Thêm
+- Quản trị: **chọn nhiều người dùng để khoá / mở khoá cùng lúc**, **trang chi tiết từng người dùng** (hồ sơ, dự án tham gia, góp ý gần đây,
+  lịch sử quản trị, thao tác), **Thêm người dùng** (quản trị viên không đặt mật khẩu hộ — hệ thống tạo link để người dùng tự đặt),
+  **Xuất CSV** danh sách đang lọc (mở được bằng Excel), lọc nhật ký theo loại thao tác.
+- Dải nhắc ở trang Dự án khi có việc đến hạn trong 24 giờ hoặc đã quá hạn (bổ sung cho thông báo chuông và email nhắc hạn đã có).
+- **100 người dùng ảo** (`bash lab.sh seed-users`, tự chạy khi `setup` trên CSDL trống): tên tiếng Việt, email `ten.ho.001@demo.pinpoint.test`,
+  mật khẩu `Pinpoint@123`, ngày tạo / đăng nhập rải trong 120 ngày, 7 tài khoản bị khoá, 4 thuộc bộ phận hỗ trợ, ~40% được thêm vào dự án mẫu.
+  Chạy lại không tạo trùng; `php tools/seed_users.php remove` để xoá.
+
+### Sửa
+- Lịch chọn hạn xử lý đôi khi tự đóng ngay khi vừa mở (sự kiện cuộn đến trễ một nhịp sau khi bấm).
+
 ## [2.5.0] - 2026-11-02
 
 ### Thêm

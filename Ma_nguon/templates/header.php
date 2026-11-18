@@ -56,11 +56,11 @@ if (!empty($user)) {
 <a class="skip-link" href="#main">Đến nội dung chính</a>
 <header class="site-header">
 <div class="header-inner">
-<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.5</small></a>
+<a class="brand" href="<?= !empty($user) ? '/projects.php' : '/login.php' ?>"><span class="brand-mark"><?= icon('pin') ?></span>Pinpoint<small>2.6</small></a>
 <?php if (!empty($user)): ?>
 <nav class="main-nav" aria-label="Điều hướng chính">
 <a href="/projects.php"<?= $active === 'projects' ? ' aria-current="page"' : '' ?>><?= icon('folder') ?>Dự án<?php if ($inviteCount > 0): ?> <span class="nav-count" title="Lời mời đang chờ"><?= $inviteCount ?></span><?php endif; ?></a>
-<a href="/inbox.php"<?= $active === 'inbox' ? ' aria-current="page"' : '' ?> title="Việc của tôi: góp ý chưa xử lý giao cho bạn phụ trách"><?= icon('inbox') ?>Việc của tôi<?php if ($myCount > 0): ?> <span class="nav-count" aria-label="<?= $myCount ?> việc giao cho bạn"><?= $myCount ?></span><?php endif; ?></a>
+<a href="/inbox.php"<?= $active === 'inbox' ? ' aria-current="page"' : '' ?> title="Việc giao cho bạn: góp ý chưa xử lý mà bạn là người phụ trách"><?= icon('inbox') ?>Việc giao cho bạn<?php if ($myCount > 0): ?> <span class="nav-count" aria-label="<?= $myCount ?> việc giao cho bạn"><?= $myCount ?></span><?php endif; ?></a>
 <a href="/help.php"<?= $active === 'help' ? ' aria-current="page"' : '' ?>><?= icon('chat') ?>Hỗ trợ</a>
 <?php if ($isSysAdmin): ?><a href="/admin.php"<?= $active === 'admin' ? ' aria-current="page"' : '' ?>><?= icon('shield') ?>Quản trị</a><?php endif; ?>
 <?php if ($isSupport): ?><a href="/support_admin.php"<?= $active === 'support' ? ' aria-current="page"' : '' ?>><?= icon('inbox') ?>Xử lý yêu cầu<?php if ($ticketCount > 0): ?> <span class="nav-count" title="Yêu cầu đang chờ"><?= $ticketCount ?></span><?php endif; ?></a><?php endif; ?>
@@ -74,6 +74,7 @@ if (!empty($user)) {
 <a class="notif-all" href="/notifications.php">Xem tất cả thông báo</a>
 </div>
 </details>
+<?php if (($active ?? '') !== 'help'): ?><button type="button" class="btn btn-subtle btn-icon assistant-btn" id="chat-open" aria-expanded="false" aria-controls="chat-panel" title="Hỏi trợ lý ảo" aria-label="Hỏi trợ lý ảo"><?= icon('sparkle') ?></button><?php endif; ?>
 <button type="button" class="btn btn-subtle btn-icon" data-theme-toggle title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối"><?= icon('moon') ?></button>
 <details class="dropdown user-menu">
 <summary aria-label="Tài khoản"><?= avatar($user['name'], (int) $user['id']) ?><span class="user-name"><?= e($user['name']) ?></span><?= icon('chevron-down', 'sm') ?></summary>
@@ -94,7 +95,7 @@ if (!empty($user)) {
 </div>
 </header>
 <main id="main" tabindex="-1"<?= $wide ? ' class="wide"' : '' ?>>
-<?php if ($flashMsg !== null): ?>
+<?php if ($flashMsg !== null && $active !== 'admin'): /* trang quản trị tự hiện thông báo trong khung của nó */ ?>
 <?php if ($wide): ?>
 <div hidden data-flash="<?= e($flashMsg) ?>" data-flash-error="<?= str_starts_with($flashMsg, 'Lỗi') ? '1' : '' ?>"></div>
 <?php else: ?>

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// "Việc của tôi": góp ý chưa xử lý được giao cho người đang đăng nhập, trong mọi dự án họ còn là thành viên.
+// "Việc giao cho bạn": góp ý chưa xử lý được giao cho người đang đăng nhập, trong mọi dự án họ còn là thành viên.
 require __DIR__ . '/../src/web.php';
 $c = db();
 $user = Auth::requireUser($c);
@@ -21,12 +21,12 @@ foreach ($items as $m) {
         $groups['Còn lại'][] = $m;
     }
 }
-$title = 'Việc của tôi';
+$title = 'Việc giao cho bạn';
 $active = 'inbox';
 require __DIR__ . '/../templates/header.php';
 ?>
 <div class="page-head">
-<div><h1>Việc của tôi</h1><p><?= $pg->total ?> góp ý chưa xử lý được giao cho bạn<?= $overdueTotal ? ' · <strong>' . $overdueTotal . ' quá hạn</strong>' : '' ?>. Sắp theo hạn rồi theo mức ưu tiên.</p></div>
+<div><h1>Việc giao cho bạn</h1><p><?= $pg->total ?> góp ý chưa xử lý mà bạn là người phụ trách<?= $overdueTotal ? ' · <strong>' . $overdueTotal . ' quá hạn</strong>' : '' ?>. Sắp theo hạn rồi theo mức ưu tiên. Con số này giống số trên menu; góp ý của người khác phụ trách không tính vào đây.</p></div>
 </div>
 <?php if ($items === []): ?>
 <div class="card empty-state"><div class="empty-art"><?= icon('check-circle') ?></div><h3>Không còn việc nào</h3><p>Khi ai đó giao góp ý cho bạn, nó sẽ xuất hiện ở đây.</p></div>
