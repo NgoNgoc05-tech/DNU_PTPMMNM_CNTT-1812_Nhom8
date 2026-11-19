@@ -39,6 +39,9 @@ Sửa theo nhận xét của giảng viên sau buổi duyệt bản 2.5.
 
 ### Sửa
 - Lịch chọn hạn xử lý đôi khi tự đóng ngay khi vừa mở (sự kiện cuộn đến trễ một nhịp sau khi bấm).
+- Hộp báo xung đột khi sửa nhận xét / ghi chú hiển thị chữ thành ba cột (khung báo dùng flex); nay gói cả câu trong một khối, có biểu tượng cảnh báo.
+- Xuất CSV danh sách người dùng ở trang quản trị chưa chặn ô bắt đầu bằng = + - @ (CSV injection); nay dùng chung `Export::safeCell` như xuất góp ý.
+- `Bao_cao.docx` viết lại theo mẫu báo cáo của học phần (4 chương, ERD sinh từ CSDL, ảnh giao diện bản 2.6).
 
 ## [2.5.0] - 2026-11-02
 

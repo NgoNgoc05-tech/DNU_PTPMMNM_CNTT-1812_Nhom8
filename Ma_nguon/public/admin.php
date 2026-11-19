@@ -95,9 +95,10 @@ if ($tab === 'users' && field($_GET, 'export') === 'csv') {
     fwrite($out, "\xEF\xBB\xBF");
     fputcsv($out, ['ID', 'Họ tên', 'Email', 'Chức danh', 'Quản trị', 'Hỗ trợ', 'Trạng thái', 'Dự án', 'Góp ý', 'Nhận xét', 'Đăng nhập gần nhất', 'Ngày tạo']);
     foreach ($rows as $r) {
-        fputcsv($out, [$r['id'], $r['name'], $r['email'], $r['title'], $r['is_admin'] === 't' ? 'có' : '', $r['is_support'] === 't' ? 'có' : '',
+        // Export::safeCell: ô bắt đầu bằng = + - @ được thêm dấu nháy để Excel không chạy như công thức (CSV injection)
+        fputcsv($out, array_map(fn ($v) => Export::safeCell((string) $v), [$r['id'], $r['name'], $r['email'], $r['title'], $r['is_admin'] === 't' ? 'có' : '', $r['is_support'] === 't' ? 'có' : '',
             $r['locked_at'] !== null ? 'Bị khoá' : 'Hoạt động', $r['projects'], $r['annotations'], $r['comments'],
-            $r['last_login_at'] ? date('d/m/Y H:i', (int) strtotime($r['last_login_at'])) : '', date('d/m/Y', (int) strtotime($r['created_at']))]);
+            $r['last_login_at'] ? date('d/m/Y H:i', (int) strtotime($r['last_login_at'])) : '', date('d/m/Y', (int) strtotime($r['created_at']))]));
     }
     exit;
 }

@@ -8,6 +8,7 @@
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICONS = {
+    'alert': '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
     'eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     'thumb-up': '<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M7 10l4-7a2.5 2.5 0 0 1 3 3l-1 4h5.5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 21H7"/>',
     'heart': '<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/>',
@@ -740,11 +741,12 @@
             lock = err.data.details.current_lock;
             var old = form.querySelector('.flash');
             if (old) { old.remove(); }
-            form.insertBefore(el('div', { class: 'flash error conflict-box', role: 'alert', 'data-conflict': '1' }, [
+            // Gói cả câu trong một <span>: .flash là flex, để rời từng mẩu chữ sẽ bị xếp thành nhiều cột.
+            form.insertBefore(el('div', { class: 'flash error conflict-box', role: 'alert', 'data-conflict': '1' }, [icon('alert'), el('span', {}, [
               'Xung đột: ghi chú hoặc thuộc tính vừa được người khác cập nhật. Ghi chú hiện tại: “',
-              el('span', { text: (err.data.details.current && err.data.details.current.note) || '(trống)' }),
+              el('strong', { text: (err.data.details.current && err.data.details.current.note) || '(trống)' }),
               '”. Nội dung bạn gõ vẫn còn; bấm “Lưu bản của tôi” nếu vẫn muốn thay.'
-            ]), area);
+            ])]), area);
             save.textContent = 'Lưu bản của tôi';
           } else { toast(err.message, true); }
         });
@@ -868,10 +870,10 @@
                 c.lock_version = err.data.details.current_lock;
                 var old = form.querySelector('.flash');
                 if (old) { old.remove(); }
-                form.insertBefore(el('div', { class: 'flash error conflict-box', role: 'alert', 'data-conflict': '1' }, [
-                  'Xung đột: nhận xét đã được sửa ở nơi khác. Bản hiện tại: “', el('span', { text: err.data.details.current_body }),
+                form.insertBefore(el('div', { class: 'flash error conflict-box', role: 'alert', 'data-conflict': '1' }, [icon('alert'), el('span', {}, [
+                  'Xung đột: nhận xét đã được sửa ở nơi khác. Bản hiện tại: “', el('strong', { text: err.data.details.current_body }),
                   '”. Nội dung bạn gõ vẫn còn bên dưới; bấm “Lưu bản của tôi” nếu vẫn muốn thay.'
-                ]), area);
+                ])]), area);
                 save.textContent = 'Lưu bản của tôi';
               } else { toast(err.message, true); }
             });
